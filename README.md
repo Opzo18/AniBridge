@@ -9,7 +9,8 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-Version **0.2.2** live: last-sync report on the settings page (counters + title lists). ✅
+Version **0.2.1** live: AniList 429 retry with backoff, 1s pacing, year-suffix fallback,
+last-sync report on the settings page. ✅
 (`dotnet test`: 80/80 passed)
 
 ## Requirements
