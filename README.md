@@ -9,8 +9,8 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-Version **0.2.0** live: settings split into pages, dry-run mode, list-URL tolerance,
-Arr dropdowns. ✅ (`dotnet test`: 68/68 passed)
+Version **0.2.2** live: last-sync report on the settings page (counters + title lists). ✅
+(`dotnet test`: 80/80 passed)
 
 ## Requirements
 
@@ -64,6 +64,8 @@ dotnet test AniBridge.slnx
 - Task `AniBridge: list sync` (Dashboard → Scheduled Tasks): daily at 04:00.
 - Manually: the **Sync now** button on the Shinden page or Run next to the task.
 - Results in the logs: `Scanned / Added / AlreadyExists / Skipped / Failed / WouldAdd`.
+- The same summary plus per-title lists lives on the Shinden settings page
+  ("Last sync" section, served from the previous run — no log digging).
 - First full sync of a large list takes a while (AniList allows ~90 requests/min,
   AniBridge paces itself) — this is normal; watch the task progress.
 

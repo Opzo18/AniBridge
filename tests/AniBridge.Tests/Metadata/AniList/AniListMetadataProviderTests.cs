@@ -88,6 +88,79 @@ public class AniListMetadataProviderTests
         Assert.Null(await CreateProvider(Json).ResolveAsync(Item("Some Clip")));
     }
 
+    [Fact]
+    public async Task ResolveAsync_YearSuffix_FallsBackToUniqueStrippedMatch()
+    {
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":21311,"title":{"romaji":"Bungou Stray Dogs","english":null,"native":null},"format":"TV","episodes":24,"startDate":{"year":2016}}
+            ]}}}
+            """;
+
+        var media = await CreateProvider(Json).ResolveAsync(Item("Bungou Stray Dogs (2016)"));
+
+        Assert.NotNull(media);
+        Assert.Equal(21311, media.AniListId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_YearSuffixWithTwoStrippedMatches_ReturnsNull()
+    {
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":1,"title":{"romaji":"Some Show","english":null,"native":null},"format":"TV","episodes":12,"startDate":{"year":2010}},
+              {"id":2,"title":{"romaji":"Some Show (2014)","english":null,"native":null},"format":"TV","episodes":12,"startDate":{"year":2014}}
+            ]}}}
+            """;
+
+        // Exact match wins for "Some Show (2014)"; for a year-less query both strip to one form.
+        Assert.NotNull(await CreateProvider(Json).ResolveAsync(Item("Some Show (2014)")));
+        Assert.Null(await CreateProvider(Json).ResolveAsync(Item("Some Show (2010)")));
+    }
+
+    [Theory]
+    [InlineData("bungou stray dogs (2016)", "bungou stray dogs")]
+    [InlineData("fairy tail", "fairy tail")]
+    [InlineData("dog days'", "dog days'")]
+    public void StripYear_StripsTrailingYearOnly(string input, string expected)
+    {
+        Assert.Equal(expected, AniListMetadataProvider.StripYear(input));
+    }
+
+    [Fact]
+    public async Task SearchAnimeAsync_RetriesOnRateLimit_ThenSucceeds()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(new HttpResponseMessage((HttpStatusCode)429)); // no Retry-After → instant fallback in tests
+        handler.Enqueue(new HttpResponseMessage((HttpStatusCode)429));
+        handler.Enqueue(Json(FrierenJson));
+        var http = new HttpClient(handler) { BaseAddress = new Uri(AniListClient.Endpoint + "/") };
+        var client = new AniListClient(http, NullLogger<AniListClient>.Instance, TimeSpan.Zero);
+
+        var provider = new AniListMetadataProvider(client, NullLogger<AniListMetadataProvider>.Instance);
+        var media = await provider.ResolveAsync(Item("Sousou no Frieren"));
+
+        Assert.NotNull(media);
+        Assert.Equal(154587, media.AniListId);
+        Assert.Equal(3, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task SearchAnimeAsync_PersistentRateLimit_ThrowsAfterMaxAttempts()
+    {
+        var handler = new QueueHandler();
+        for (var i = 0; i < 5; i++)
+        {
+            handler.Enqueue(new HttpResponseMessage((HttpStatusCode)429));
+        }
+
+        var http = new HttpClient(handler) { BaseAddress = new Uri(AniListClient.Endpoint + "/") };
+        var client = new AniListClient(http, NullLogger<AniListClient>.Instance, TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.SearchAnimeAsync("Frieren"));
+        Assert.Equal(5, handler.Requests.Count);
+    }
+
     [Theory]
     [InlineData("TV", MediaType.Tv)]
     [InlineData("TV_SHORT", MediaType.Tv)]
@@ -102,6 +175,9 @@ public class AniListMetadataProviderTests
         Assert.Equal(expected, AniListMetadataProvider.MapFormat(format));
     }
 
+    private static HttpResponseMessage Json(string body) =>
+        new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
     private sealed class SingleResponseHandler(string json) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -110,5 +186,21 @@ public class AniListMetadataProviderTests
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json"),
             });
+    }
+
+    private sealed class QueueHandler : HttpMessageHandler
+    {
+        private readonly Queue<HttpResponseMessage> _responses = new();
+
+        public List<HttpRequestMessage> Requests { get; } = new();
+
+        public void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Task.FromResult(_responses.Dequeue());
+        }
     }
 }

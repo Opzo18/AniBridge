@@ -15,7 +15,7 @@ namespace AniBridge.Sync;
 /// </summary>
 public sealed class SyncService
 {
-    private static readonly TimeSpan DefaultPacing = TimeSpan.FromMilliseconds(750); // AniList limit 90/min
+    private static readonly TimeSpan DefaultPacing = TimeSpan.FromMilliseconds(1000); // AniList limit 90/min
 
     private readonly IAnimeProvider _provider;
     private readonly IMetadataProvider _metadata;
@@ -24,6 +24,7 @@ public sealed class SyncService
     private readonly ILogger<SyncService> _logger;
     private readonly Func<PluginConfiguration?> _config;
     private readonly TimeSpan _pacing;
+    private readonly ISyncReportStore? _reportStore;
 
     public SyncService(
         IAnimeProvider provider,
@@ -32,7 +33,8 @@ public sealed class SyncService
         Lazy<RadarrClient> radarr,
         ILogger<SyncService> logger,
         Func<PluginConfiguration?>? configProvider = null,
-        TimeSpan? pacing = null)
+        TimeSpan? pacing = null,
+        ISyncReportStore? reportStore = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
@@ -41,6 +43,7 @@ public sealed class SyncService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _config = configProvider ?? (() => Plugin.Instance?.Configuration);
         _pacing = pacing ?? DefaultPacing;
+        _reportStore = reportStore;
     }
 
     public async Task<SyncResult> RunAsync(
@@ -62,7 +65,30 @@ public sealed class SyncService
 
         var result = new SyncResult { Items = results };
         _logger.LogInformation("AniBridge: sync finished: {Result}", result);
+        SaveReport(config, result);
         return result;
+    }
+
+    private void SaveReport(PluginConfiguration? config, SyncResult result)
+    {
+        if (_reportStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _reportStore.Save(new SyncReport
+            {
+                FinishedAt = DateTimeOffset.UtcNow,
+                DryRun = config?.DryRun ?? false,
+                Result = result,
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "AniBridge: could not save last sync report.");
+        }
     }
 
     private async Task<SyncItem> ProcessAsync(

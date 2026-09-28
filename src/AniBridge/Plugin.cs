@@ -15,6 +15,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        Paths = applicationPaths;
     }
 
     /// <inheritdoc />
@@ -30,6 +31,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Current plugin instance.
     /// </summary>
     public static Plugin? Instance { get; private set; }
+
+    /// <summary>
+    /// Application paths captured at startup (for the sync report directory).
+    /// </summary>
+    public static IApplicationPaths? Paths { get; private set; }
 
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()

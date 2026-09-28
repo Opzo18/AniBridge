@@ -76,6 +76,19 @@
                     </button>
                 </div>
                 <div class="fieldDescription" id="AniBridgeSyncStatus"></div>
+
+                <h3 class="sectionTitle">Last sync</h3>
+                <div>
+                    <button id="AniBridgeRefreshReport" is="emby-button" type="button" class="raised block emby-button">
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                <div class="fieldDescription" id="AniBridgeLastSyncMeta">No sync has run yet.</div>
+                <div class="fieldDescription" id="AniBridgeLastSyncCounts"></div>
+                <h4 class="sectionTitle">Added / existing / would add</h4>
+                <ul id="AniBridgeAddedList"></ul>
+                <h4 class="sectionTitle">Skipped / failed</h4>
+                <ul id="AniBridgeSkippedList"></ul>
             </form>
         </div>
     </div>
@@ -142,5 +155,58 @@
                 status.textContent = 'Failed to load scheduled tasks.';
             });
         });
+
+        function aniBridgeFillList(id, items, textFn, limit) {
+            var ul = document.querySelector('#' + id);
+            ul.innerHTML = '';
+            var shown = items.slice(0, limit);
+            shown.forEach(function (item) {
+                var li = document.createElement('li');
+                li.textContent = textFn(item);
+                ul.appendChild(li);
+            });
+            if (items.length > shown.length) {
+                var more = document.createElement('li');
+                more.textContent = '…and ' + (items.length - shown.length) + ' more';
+                ul.appendChild(more);
+            }
+            if (items.length === 0) {
+                var none = document.createElement('li');
+                none.textContent = '—';
+                ul.appendChild(none);
+            }
+        }
+
+        function aniBridgeLoadReport() {
+            var meta = document.querySelector('#AniBridgeLastSyncMeta');
+            meta.textContent = 'Loading…';
+            ApiClient.ajax({
+                type: 'GET',
+                url: ApiClient.getUrl('AniBridge/last-sync'),
+                dataType: 'json'
+            }).then(function (report) {
+                var r = report.result || {};
+                var items = r.items || [];
+                var when = report.finishedAt ? new Date(report.finishedAt).toLocaleString() : 'unknown time';
+                meta.textContent = 'Finished: ' + when + (report.dryRun ? ' (dry run)' : '');
+                var counts = ['Scanned', 'Added', 'AlreadyExists', 'Skipped', 'Failed', 'WouldAdd']
+                    .map(function (k) { return k + ': ' + (r[k.charAt(0).toLowerCase() + k.slice(1)] || 0); });
+                document.querySelector('#AniBridgeLastSyncCounts').textContent = counts.join(' · ');
+                var good = items.filter(function (i) { return i.outcome === 0 || i.outcome === 1 || i.outcome === 4; });
+                var bad = items.filter(function (i) { return i.outcome === 2 || i.outcome === 3; });
+                aniBridgeFillList('AniBridgeAddedList', good, function (i) { return i.title; }, 300);
+                aniBridgeFillList('AniBridgeSkippedList', bad, function (i) {
+                    return i.title + (i.detail ? ' — ' + i.detail : '');
+                }, 300);
+            }, function () {
+                meta.textContent = 'No sync has run yet.';
+                document.querySelector('#AniBridgeLastSyncCounts').textContent = '';
+                aniBridgeFillList('AniBridgeAddedList', [], function (i) { return i.title; }, 300);
+                aniBridgeFillList('AniBridgeSkippedList', [], function (i) { return i.title; }, 300);
+            });
+        }
+
+        document.querySelector('#AniBridgeRefreshReport').addEventListener('click', aniBridgeLoadReport);
+        document.querySelector('#AniBridgeShindenPage').addEventListener('pageshow', aniBridgeLoadReport);
     </script>
 </div>

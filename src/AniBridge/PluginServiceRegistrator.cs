@@ -50,12 +50,19 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             new Lazy<SonarrClient>(sp.GetRequiredService<SonarrClient>));
         serviceCollection.AddSingleton(sp =>
             new Lazy<RadarrClient>(sp.GetRequiredService<RadarrClient>));
+        serviceCollection.AddSingleton<ISyncReportStore>(sp => new FileSyncReportStore(
+            Path.Combine(
+                Plugin.Paths?.DataPath ?? Path.GetTempPath(),
+                "anibridge"),
+            sp.GetRequiredService<ILogger<FileSyncReportStore>>()));
         serviceCollection.AddSingleton<SyncService>(sp => new SyncService(
             sp.GetRequiredService<IAnimeProvider>(),
             sp.GetRequiredService<IMetadataProvider>(),
             sp.GetRequiredService<Lazy<SonarrClient>>(),
             sp.GetRequiredService<Lazy<RadarrClient>>(),
             sp.GetRequiredService<ILogger<SyncService>>(),
-            () => Plugin.Instance?.Configuration));
+            () => Plugin.Instance?.Configuration,
+            null,
+            sp.GetRequiredService<ISyncReportStore>()));
     }
 }

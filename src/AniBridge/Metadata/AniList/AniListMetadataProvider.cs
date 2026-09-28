@@ -32,7 +32,8 @@ public sealed class AniListMetadataProvider : IMetadataProvider
             return null;
         }
 
-        var match = candidates.FirstOrDefault(c => IsTitleMatch(c, item.Title));
+        var match = candidates.FirstOrDefault(c => IsTitleMatch(c, item.Title))
+            ?? UniqueStrippedMatch(candidates, item.Title);
         if (match is null)
         {
             _logger.LogWarning(
@@ -67,6 +68,44 @@ public sealed class AniListMetadataProvider : IMetadataProvider
             || (candidate.Title.English is not null && Normalize(candidate.Title.English) == wanted)
             || (candidate.Title.Native is not null && Normalize(candidate.Title.Native) == wanted);
     }
+
+    /// <summary>
+    /// Fallback for titles with a year suffix ("Bungou Stray Dogs (2016)").
+    /// Used only when nothing matches exactly, and only when exactly one
+    /// candidate matches after stripping — otherwise it stays ambiguous.
+    /// </summary>
+    public static AniListMedia? UniqueStrippedMatch(IReadOnlyList<AniListMedia> candidates, string title)
+    {
+        var wanted = StripYear(Normalize(title));
+        AniListMedia? found = null;
+        foreach (var c in candidates)
+        {
+            if (c.Title is null)
+            {
+                continue;
+            }
+
+            var hit = (c.Title.Romaji is not null && StripYear(Normalize(c.Title.Romaji)) == wanted)
+                || (c.Title.English is not null && StripYear(Normalize(c.Title.English)) == wanted)
+                || (c.Title.Native is not null && StripYear(Normalize(c.Title.Native)) == wanted);
+            if (!hit)
+            {
+                continue;
+            }
+
+            if (found is not null)
+            {
+                return null; // more than one — still ambiguous
+            }
+
+            found = c;
+        }
+
+        return found;
+    }
+
+    public static string StripYear(string normalizedTitle) =>
+        System.Text.RegularExpressions.Regex.Replace(normalizedTitle, @"\s*\(\d{4}\)$", "");
 
     public static MediaType? MapFormat(string? format) => format?.Trim().ToUpperInvariant() switch
     {

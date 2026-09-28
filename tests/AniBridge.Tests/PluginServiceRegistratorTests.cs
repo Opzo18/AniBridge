@@ -32,6 +32,7 @@ public class PluginServiceRegistratorTests
         Assert.Contains(typeof(RadarrClient), types);
         Assert.Contains(typeof(Lazy<SonarrClient>), types);
         Assert.Contains(typeof(Lazy<RadarrClient>), types);
+        Assert.Contains(typeof(ISyncReportStore), types);
         Assert.Contains(typeof(SyncService), types);
     }
 }

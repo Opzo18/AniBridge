@@ -8,6 +8,22 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.2.2.0",
+        "changelog": "Last-sync report on the settings page (counters and title lists).",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.2.2/anibridge_0.2.2.zip",
+        "checksum": "6bd277355f843be344337bc478f83918",
+        "timestamp": "2026-09-28 21:32:29"
+      },
+      {
+        "version": "0.2.1.0",
+        "changelog": "AniList 429 retry with backoff, 1s pacing, year-suffix fallback matching.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.2.1/anibridge_0.2.1.zip",
+        "checksum": "462db4ef8424069312a6f26268017257",
+        "timestamp": "2026-09-28 21:12:31"
+      },
+      {
         "version": "0.2.0.0",
         "changelog": "Settings split into pages, dry-run mode, list URL tolerance, Arr dropdowns.",
         "targetAbi": "12.1.0.0",
