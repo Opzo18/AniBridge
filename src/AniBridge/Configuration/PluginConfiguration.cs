@@ -66,4 +66,9 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool SyncOnHold { get; set; } = true;
 
     public bool SyncDropped { get; set; }
+
+    /// <summary>
+    /// Dry run: full pass with logging, but nothing is added to Sonarr/Radarr.
+    /// </summary>
+    public bool DryRun { get; set; } = true;
 }

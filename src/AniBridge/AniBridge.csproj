@@ -8,11 +8,11 @@
     <!-- Jellyfin plugin: assembly name must match output dll placed in plugins/AniBridge/ -->
     <AssemblyName>AniBridge</AssemblyName>
     <RootNamespace>AniBridge</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Configuration/configPage.html" />
+    <EmbeddedResource Include="Configuration/*.html" />
     <PackageReference Include="AngleSharp" Version="1.8.2" />
     <PackageReference Include="Jellyfin.Controller" Version="12.1.0">
       <ExcludeAssets>runtime</ExcludeAssets>

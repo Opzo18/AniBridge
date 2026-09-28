@@ -17,8 +17,10 @@ public sealed class SyncResult
 
     public int Failed => Count(SyncOutcome.Failed);
 
+    public int WouldAdd => Count(SyncOutcome.WouldAdd);
+
     public override string ToString() =>
-        $"Scanned: {Scanned}, Added: {Added}, AlreadyExists: {AlreadyExists}, Skipped: {Skipped}, Failed: {Failed}";
+        $"Scanned: {Scanned}, Added: {Added}, AlreadyExists: {AlreadyExists}, Skipped: {Skipped}, Failed: {Failed}, WouldAdd: {WouldAdd}";
 
     private int Count(SyncOutcome outcome) => Items.Count(i => i.Outcome == outcome);
 }

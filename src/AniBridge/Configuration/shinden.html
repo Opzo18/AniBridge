@@ -1,0 +1,146 @@
+<div id="AniBridgeShindenPage" data-role="page" class="page type-interior pluginConfigurationPage"
+    data-require="emby-input,emby-button,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="AniBridgeShindenForm">
+                <h3 class="sectionTitle">Shinden.pl</h3>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="ShindenEnabled" />
+                        <span>Enable Shinden sync</span>
+                    </label>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ShindenUsername">Login or email</label>
+                    <input id="ShindenUsername" type="text" is="emby-input" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ShindenPassword">Password</label>
+                    <input id="ShindenPassword" type="password" is="emby-input" autocomplete="off" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ShindenUserId">List ID (e.g. 420984-opzo)</label>
+                    <input id="ShindenUserId" type="text" is="emby-input" />
+                    <div class="fieldDescription">Public list: https://shinden.pl/animelist/YOUR-ID (a pasted full URL works too)</div>
+                </div>
+
+                <h3 class="sectionTitle">Synced statuses</h3>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="SyncWatching" />
+                        <span>Watching</span>
+                    </label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="SyncPlanned" />
+                        <span>Planned</span>
+                    </label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="SyncCompleted" />
+                        <span>Completed</span>
+                    </label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="SyncOnHold" />
+                        <span>On hold</span>
+                    </label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="SyncDropped" />
+                        <span>Dropped</span>
+                    </label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="DryRun" />
+                        <span>Dry run — log what would be added without adding anything</span>
+                    </label>
+                    <div class="fieldDescription">Recommended for the first run. Turn off when the log looks right.</div>
+                </div>
+
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>Save</span>
+                    </button>
+                </div>
+
+                <h3 class="sectionTitle">Manual sync</h3>
+                <div>
+                    <button id="AniBridgeSyncNow" is="emby-button" type="button" class="raised block emby-button">
+                        <span>Sync now</span>
+                    </button>
+                </div>
+                <div class="fieldDescription" id="AniBridgeSyncStatus"></div>
+            </form>
+        </div>
+    </div>
+    <script type="text/javascript">
+        var AniBridgeShinden = {
+            pluginId: 'befab610-6eca-4d99-8e12-cdb4e26114aa',
+            taskKey: 'AniBridgeDailySync'
+        };
+
+        document.querySelector('#AniBridgeShindenPage').addEventListener('pageshow', function () {
+            Dashboard.showLoadingMsg();
+            ApiClient.getPluginConfiguration(AniBridgeShinden.pluginId).then(function (config) {
+                document.querySelector('#ShindenEnabled').checked = config.ShindenEnabled;
+                document.querySelector('#ShindenUsername').value = config.ShindenUsername || '';
+                document.querySelector('#ShindenPassword').value = config.ShindenPassword || '';
+                document.querySelector('#ShindenUserId').value = config.ShindenUserId || '';
+                document.querySelector('#SyncWatching').checked = config.SyncWatching;
+                document.querySelector('#SyncPlanned').checked = config.SyncPlanned;
+                document.querySelector('#SyncCompleted').checked = config.SyncCompleted;
+                document.querySelector('#SyncOnHold').checked = config.SyncOnHold;
+                document.querySelector('#SyncDropped').checked = config.SyncDropped;
+                document.querySelector('#DryRun').checked = config.DryRun;
+                Dashboard.hideLoadingMsg();
+            });
+        });
+
+        document.querySelector('#AniBridgeShindenForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            Dashboard.showLoadingMsg();
+            ApiClient.getPluginConfiguration(AniBridgeShinden.pluginId).then(function (config) {
+                config.ShindenEnabled = document.querySelector('#ShindenEnabled').checked;
+                config.ShindenUsername = document.querySelector('#ShindenUsername').value;
+                config.ShindenPassword = document.querySelector('#ShindenPassword').value;
+                config.ShindenUserId = document.querySelector('#ShindenUserId').value;
+                config.SyncWatching = document.querySelector('#SyncWatching').checked;
+                config.SyncPlanned = document.querySelector('#SyncPlanned').checked;
+                config.SyncCompleted = document.querySelector('#SyncCompleted').checked;
+                config.SyncOnHold = document.querySelector('#SyncOnHold').checked;
+                config.SyncDropped = document.querySelector('#SyncDropped').checked;
+                config.DryRun = document.querySelector('#DryRun').checked;
+                ApiClient.updatePluginConfiguration(AniBridgeShinden.pluginId, config).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                });
+            });
+            return false;
+        });
+
+        document.querySelector('#AniBridgeSyncNow').addEventListener('click', function () {
+            var status = document.querySelector('#AniBridgeSyncStatus');
+            status.textContent = 'Looking for the sync task…';
+            ApiClient.getScheduledTasks().then(function (tasks) {
+                var task = tasks.find(function (t) { return t.Key === AniBridgeShinden.taskKey; });
+                if (!task) {
+                    status.textContent = 'AniBridgeDailySync task not found. Restart the server.';
+                    return;
+                }
+                status.textContent = 'Starting sync… follow progress in Dashboard → Scheduled Tasks.';
+                ApiClient.startScheduledTask(task.Id).then(function () {
+                    status.textContent = 'Sync started. See Dashboard → Scheduled Tasks for results.';
+                }, function () {
+                    status.textContent = 'Failed to start sync.';
+                });
+            }, function () {
+                status.textContent = 'Failed to load scheduled tasks.';
+            });
+        });
+    </script>
+</div>

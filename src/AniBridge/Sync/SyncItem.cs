@@ -8,6 +8,10 @@ public enum SyncOutcome
     AlreadyExists,
     Skipped,
     Failed,
+    /// <summary>
+    /// Dry run only: would be added with DryRun off.
+    /// </summary>
+    WouldAdd,
 }
 
 /// <summary>

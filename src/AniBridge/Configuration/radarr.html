@@ -1,0 +1,106 @@
+<div id="AniBridgeRadarrPage" data-role="page" class="page type-interior pluginConfigurationPage"
+    data-require="emby-input,emby-button,emby-checkbox,emby-select">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="AniBridgeRadarrForm">
+                <h3 class="sectionTitle">Radarr (movies)</h3>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="RadarrEnabled" />
+                        <span>Enable Radarr</span>
+                    </label>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="RadarrUrl">URL (e.g. http://192.168.33.20:7878)</label>
+                    <input id="RadarrUrl" type="text" is="emby-input" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">API key</label>
+                    <input id="RadarrApiKey" type="password" is="emby-input" autocomplete="off" />
+                    <div class="fieldDescription">Save first, then reopen this page to load the lists below from Radarr.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="RadarrQualityProfileId">Quality profile</label>
+                    <select is="emby-select" id="RadarrQualityProfileId" class="emby-select"></select>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="RadarrRootFolder">Root folder</label>
+                    <select is="emby-select" id="RadarrRootFolder" class="emby-select"></select>
+                </div>
+                <div class="fieldDescription" id="AniBridgeRadarrWarn"></div>
+
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>Save</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script type="text/javascript">
+        var AniBridgeRadarr = { pluginId: 'befab610-6eca-4d99-8e12-cdb4e26114aa' };
+
+        function aniBridgeFillSelectRadarr(id, items, current) {
+            var sel = document.querySelector('#' + id);
+            sel.innerHTML = '';
+            var values = items.slice();
+            if (current && !values.some(function (v) { return v.value === current; })) {
+                values.unshift({ value: current, text: current + ' (saved)' });
+            }
+            values.forEach(function (v) {
+                var o = document.createElement('option');
+                o.value = v.value;
+                o.textContent = v.text;
+                sel.appendChild(o);
+            });
+            if (current) { sel.value = current; }
+        }
+
+        document.querySelector('#AniBridgeRadarrPage').addEventListener('pageshow', function () {
+            Dashboard.showLoadingMsg();
+            ApiClient.getPluginConfiguration(AniBridgeRadarr.pluginId).then(function (config) {
+                document.querySelector('#RadarrEnabled').checked = config.RadarrEnabled;
+                document.querySelector('#RadarrUrl').value = config.RadarrUrl || '';
+                document.querySelector('#RadarrApiKey').value = config.RadarrApiKey || '';
+                var warn = document.querySelector('#AniBridgeRadarrWarn');
+                var savedProfile = String(config.RadarrQualityProfileId || 1);
+                var savedFolder = config.RadarrRootFolder || '';
+                aniBridgeFillSelectRadarr('RadarrQualityProfileId', [], savedProfile);
+                aniBridgeFillSelectRadarr('RadarrRootFolder', [], savedFolder);
+                ApiClient.ajax({
+                    type: 'GET',
+                    url: ApiClient.getUrl('AniBridge/radarr/options'),
+                    dataType: 'json'
+                }).then(function (data) {
+                    aniBridgeFillSelectRadarr('RadarrQualityProfileId',
+                        (data.qualityProfiles || []).map(function (p) { return { value: String(p.id), text: p.name }; }),
+                        savedProfile);
+                    aniBridgeFillSelectRadarr('RadarrRootFolder',
+                        (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
+                        savedFolder);
+                    warn.textContent = data.error || '';
+                    Dashboard.hideLoadingMsg();
+                }, function () {
+                    warn.textContent = 'Could not load lists from Radarr. Check URL/key, saved values kept.';
+                    Dashboard.hideLoadingMsg();
+                });
+            });
+        });
+
+        document.querySelector('#AniBridgeRadarrForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            Dashboard.showLoadingMsg();
+            ApiClient.getPluginConfiguration(AniBridgeRadarr.pluginId).then(function (config) {
+                config.RadarrEnabled = document.querySelector('#RadarrEnabled').checked;
+                config.RadarrUrl = document.querySelector('#RadarrUrl').value;
+                config.RadarrApiKey = document.querySelector('#RadarrApiKey').value;
+                config.RadarrQualityProfileId = parseInt(document.querySelector('#RadarrQualityProfileId').value, 10) || 1;
+                config.RadarrRootFolder = document.querySelector('#RadarrRootFolder').value;
+                ApiClient.updatePluginConfiguration(AniBridgeRadarr.pluginId, config).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                });
+            });
+            return false;
+        });
+    </script>
+</div>

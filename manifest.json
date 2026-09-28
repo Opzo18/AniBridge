@@ -8,6 +8,14 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.2.0.0",
+        "changelog": "Settings split into pages, dry-run mode, list URL tolerance, Arr dropdowns.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.2.0/anibridge_0.2.0.zip",
+        "checksum": "1b1e86145715fc88580eef2d8790b993",
+        "timestamp": "2026-09-28 20:43:33"
+      },
+      {
         "version": "0.1.0.0",
         "changelog": "First release: Shinden, AniList, Sonarr, Radarr, daily sync.",
         "targetAbi": "12.1.0.0",

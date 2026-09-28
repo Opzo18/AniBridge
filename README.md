@@ -9,7 +9,8 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-All steps 1–10 done. ✅ (`dotnet test`: 59/59 passed)
+Version **0.2.0** live: settings split into pages, dry-run mode, list-URL tolerance,
+Arr dropdowns. ✅ (`dotnet test`: 68/68 passed)
 
 ## Requirements
 
@@ -46,21 +47,25 @@ dotnet test AniBridge.slnx
 3. Create a GitHub Release tagged `v<version>` and upload `dist/anibridge_<version>.zip`.
 4. Commit `manifest.json` (and the code).
 
-## Configuration (plugin page)
+## Configuration (plugin pages)
 
-- **Shinden**: toggle, login/email, password, list ID (e.g. `624951-nick` from `shinden.pl/animelist/…`).
-- **Sonarr/Radarr**: toggle, URL, API key (Settings → General → Security), quality profile ID,
-  root folder **identical** to the one in Sonarr/Radarr (the server validates the path).
+- **AniBridge Shinden**: toggle, login/email, password, list ID (`420984-opzo`
+  from `shinden.pl/animelist/…` — a pasted full URL works too), synced statuses,
+  **dry run** (on by default: logs what would be added without adding anything),
+  **Sync now** button.
+- **AniBridge Sonarr / Radarr**: toggle, URL, API key (Settings → General → Security),
+  quality profile and root folder picked from dropdowns loaded live from the *Arr
+  (save the URL/key first, then reopen the page). If the *Arr is unreachable,
+  saved values are kept and a warning is shown.
 - **Statuses**: which list statuses take part in the sync (everything except Dropped by default).
-
-Quality profile ID: Sonarr/Radarr → Settings → Profiles → click the profile, the ID is visible in the URL
-(`/settings/profiles/2` → `2`). Root folder: Settings → Media Management → Root Folders.
 
 ## How it works
 
 - Task `AniBridge: list sync` (Dashboard → Scheduled Tasks): daily at 04:00.
-- Manually: the **Sync now** button on the plugin page or Run next to the task.
-- Results in the logs: `Scanned / Added / AlreadyExists / Skipped / Failed`.
+- Manually: the **Sync now** button on the Shinden page or Run next to the task.
+- Results in the logs: `Scanned / Added / AlreadyExists / Skipped / Failed / WouldAdd`.
+- First full sync of a large list takes a while (AniList allows ~90 requests/min,
+  AniBridge paces itself) — this is normal; watch the task progress.
 
 Rules: TV → Sonarr, movies → Radarr; an uncertain title = skipped + warning (never guessing);
 an existing entry = no action; nothing is ever deleted — neither entries nor files.

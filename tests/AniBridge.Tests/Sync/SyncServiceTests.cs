@@ -26,6 +26,7 @@ public class SyncServiceTests
     {
         SonarrEnabled = true,
         RadarrEnabled = true,
+        DryRun = false, // dry run has its own test
     };
 
     private static HttpResponseMessage Json(string body) =>
@@ -85,7 +86,7 @@ public class SyncServiceTests
 
         var result = await service.RunAsync();
 
-        Assert.Equal("Scanned: 4, Added: 2, AlreadyExists: 1, Skipped: 1, Failed: 0", result.ToString());
+        Assert.Equal("Scanned: 4, Added: 2, AlreadyExists: 1, Skipped: 1, Failed: 0, WouldAdd: 0", result.ToString());
     }
 
     [Fact]
@@ -134,7 +135,7 @@ public class SyncServiceTests
 
         var result = await service.RunAsync();
 
-        Assert.Equal("Scanned: 2, Added: 1, AlreadyExists: 0, Skipped: 0, Failed: 1", result.ToString());
+        Assert.Equal("Scanned: 2, Added: 1, AlreadyExists: 0, Skipped: 0, Failed: 1, WouldAdd: 0", result.ToString());
         Assert.Equal("Broken", result.Items.First(i => i.Outcome == SyncOutcome.Failed).Title);
     }
 
@@ -152,6 +153,35 @@ public class SyncServiceTests
 
         var item = Assert.Single(result.Items);
         Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_MarksWouldAddWithoutPost()
+    {
+        var provider = new FakeProvider(Item("Dry Series"));
+        var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>
+        {
+            ["Dry Series"] = Tv("Dry Series"),
+        });
+
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("""[{"id":0,"title":"Dry Series","tvdbId":401}]"""));
+        handler.Enqueue(Json("[]")); // not present
+        // NOTE: no lookup + POST for AddAsync — dry run must stop here.
+
+        var config = Config();
+        config.DryRun = true;
+        var service = Create(provider, metadata, config,
+            new Lazy<SonarrClient>(() => Sonarr(handler)),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")));
+
+        var result = await service.RunAsync();
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(SyncOutcome.WouldAdd, item.Outcome);
+        Assert.Equal(1, result.WouldAdd);
+        Assert.Equal(2, handler.Requests.Count); // lookup + exists check only
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
     }
 
     private sealed class FakeProvider(params AnimeListItem[] items) : IAnimeProvider
@@ -174,10 +204,15 @@ public class SyncServiceTests
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
 
+        public List<HttpRequestMessage> Requests { get; } = new();
+
         public void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
 
         protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(_responses.Dequeue());
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Task.FromResult(_responses.Dequeue());
+        }
     }
 }

@@ -38,8 +38,18 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         [
             new PluginPageInfo
             {
-                Name = "anibridge",
-                EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html",
+                Name = "AniBridge Shinden",
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.shinden.html",
+            },
+            new PluginPageInfo
+            {
+                Name = "AniBridge Sonarr",
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.sonarr.html",
+            },
+            new PluginPageInfo
+            {
+                Name = "AniBridge Radarr",
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.radarr.html",
             },
         ];
     }

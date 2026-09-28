@@ -93,6 +93,13 @@ public sealed class SyncService
                 return new SyncItem(item.Title, item.Status, SyncOutcome.AlreadyExists, null);
             }
 
+            if (config.DryRun)
+            {
+                _logger.LogInformation(
+                    "AniBridge (dry run): would add {Title} to {Arr}.", item.Title, arr.Name);
+                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, arr.Name);
+            }
+
             await arr.AddAsync(media, item.Status, cancellationToken).ConfigureAwait(false);
             return new SyncItem(item.Title, item.Status, SyncOutcome.Added, null);
         }
