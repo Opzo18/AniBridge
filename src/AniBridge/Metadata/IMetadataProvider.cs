@@ -1,0 +1,14 @@
+using AniBridge.Providers.Models;
+
+namespace AniBridge.Metadata;
+
+/// <summary>
+/// Resolves a normalized list entry (title) to concrete media
+/// (series/movie + ID). Returns null when the match is ambiguous.
+/// </summary>
+public interface IMetadataProvider
+{
+    string Name { get; }
+
+    Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default);
+}

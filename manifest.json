@@ -1,0 +1,20 @@
+[
+  {
+    "category": "General",
+    "guid": "befab610-6eca-4d99-8e12-cdb4e26114aa",
+    "name": "AniBridge",
+    "description": "Syncs anime lists from Shinden.pl with Sonarr (TV shows) and Radarr (movies).",
+    "owner": "Opzo18",
+    "overview": "Shinden -> Sonarr/Radarr",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "First release: Shinden, AniList, Sonarr, Radarr, daily sync.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.1.0/anibridge_0.1.0.zip",
+        "checksum": "31d755eac6b463d4840c059865889c18",
+        "timestamp": "2026-09-28 19:14:38"
+      }
+    ]
+  }
+]

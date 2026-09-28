@@ -1,0 +1,155 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using AniBridge.Metadata;
+using AniBridge.Providers.Models;
+using Microsoft.Extensions.Logging;
+
+namespace AniBridge.Arr.Sonarr;
+
+/// <summary>
+/// Sonarr API v3 client (series). Title-based lookup via
+/// /series/lookup with EXACT matching (title + alternateTitles) —
+/// when uncertain, skip instead of guessing.
+/// </summary>
+public sealed class SonarrClient : IArrClient
+{
+    public const string ClientName = "Sonarr";
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
+    private readonly HttpClient _http;
+    private readonly ILogger<SonarrClient> _logger;
+    private readonly int _qualityProfileId;
+    private readonly string _rootFolderPath;
+
+    public SonarrClient(
+        HttpClient http, ILogger<SonarrClient> logger, int qualityProfileId, string rootFolderPath)
+    {
+        _http = http ?? throw new ArgumentNullException(nameof(http));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _qualityProfileId = qualityProfileId;
+        _rootFolderPath = rootFolderPath ?? throw new ArgumentNullException(nameof(rootFolderPath));
+    }
+
+    public string Name => ClientName;
+
+    /// <summary>
+    /// Production factory: BaseAddress from configuration + X-Api-Key header.
+    /// </summary>
+    public static SonarrClient CreateDefault(
+        ILogger<SonarrClient> logger, string baseUrl, string apiKey, int qualityProfileId, string rootFolderPath)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException("Sonarr is not configured (URL or API key).");
+        }
+        var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/api/v3/") };
+        http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+        http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        return new SonarrClient(http, logger, qualityProfileId, rootFolderPath);
+    }
+
+    public async Task<bool> ExistsAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
+    {
+        var series = await LookupExactAsync(media.Title, cancellationToken).ConfigureAwait(false);
+        if (series is null)
+        {
+            return false;
+        }
+
+        var existing = await GetByTvdbIdAsync(series.TvdbId, cancellationToken).ConfigureAwait(false);
+        return existing.Count > 0;
+    }
+
+    public async Task AddAsync(ResolvedMedia media, AnimeStatus status, CancellationToken cancellationToken = default)
+    {
+        var series = await LookupExactAsync(media.Title, cancellationToken).ConfigureAwait(false);
+        if (series is null)
+        {
+            _logger.LogWarning("Sonarr: no exact match for {Title}, skipping.", media.Title);
+            return;
+        }
+
+        var (monitored, monitor, search) = MapMonitoring(status);
+        var payload = new SonarrNewSeries
+        {
+            Title = series.Title ?? media.Title,
+            TvdbId = series.TvdbId,
+            QualityProfileId = _qualityProfileId,
+            RootFolderPath = _rootFolderPath,
+            Monitored = monitored,
+            MonitorNewItems = monitor,
+            AddOptions = new SonarrAddOptions
+            {
+                Monitor = monitor,
+                SearchForMissingEpisodes = search,
+            },
+        };
+
+        using var resp = await _http.PostAsJsonAsync(
+            "series", payload, JsonOptions, cancellationToken).ConfigureAwait(false);
+        resp.EnsureSuccessStatusCode();
+        _logger.LogInformation(
+            "Sonarr: added {Title} (tvdb {TvdbId}, monitor {Monitor}).",
+            payload.Title, payload.TvdbId, monitor);
+    }
+
+    /// <summary>
+    /// Maps user status to monitoring. Completed/Dropped neither search
+    /// nor monitor new episodes; Watching searches for missing episodes immediately.
+    /// </summary>
+    public static (bool Monitored, string Monitor, bool Search) MapMonitoring(AnimeStatus status) =>
+        status switch
+        {
+            AnimeStatus.Watching => (true, "all", true),
+            AnimeStatus.Planned => (true, "future", false),
+            AnimeStatus.OnHold => (true, "none", false),
+            AnimeStatus.Completed => (false, "none", false),
+            AnimeStatus.Dropped => (false, "none", false),
+            _ => (false, "none", false),
+        };
+
+    private async Task<SonarrSeries?> LookupExactAsync(string title, CancellationToken cancellationToken)
+    {
+        using var resp = await _http.GetAsync(
+            $"series/lookup?term={Uri.EscapeDataString(title)}", cancellationToken).ConfigureAwait(false);
+        resp.EnsureSuccessStatusCode();
+
+        await using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var candidates = await JsonSerializer.DeserializeAsync<List<SonarrSeries>>(
+            stream, JsonOptions, cancellationToken).ConfigureAwait(false);
+
+        if (candidates is null || candidates.Count == 0)
+        {
+            return null;
+        }
+
+        var wanted = Normalize(title);
+        return candidates.FirstOrDefault(c =>
+            (c.Title is not null && Normalize(c.Title) == wanted)
+            || (c.AlternateTitles is not null && c.AlternateTitles.Any(a =>
+                a.Title is not null && Normalize(a.Title) == wanted)));
+    }
+
+    private async Task<List<SonarrSeries>> GetByTvdbIdAsync(int tvdbId, CancellationToken cancellationToken)
+    {
+        using var resp = await _http.GetAsync(
+            $"series?tvdbId={tvdbId}", cancellationToken).ConfigureAwait(false);
+        resp.EnsureSuccessStatusCode();
+
+        await using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        return await JsonSerializer.DeserializeAsync<List<SonarrSeries>>(
+            stream, JsonOptions, cancellationToken).ConfigureAwait(false) ?? [];
+    }
+
+    private static string Normalize(string title)
+    {
+        var s = title.Trim().ToLowerInvariant()
+            .Replace('’', '\'').Replace('‘', '\'').Replace('`', '\'');
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
+        return s.TrimEnd('.', '!', '?', '…');
+    }
+}

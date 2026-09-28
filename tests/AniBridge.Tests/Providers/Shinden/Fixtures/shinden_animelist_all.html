@@ -1,0 +1,603 @@
+
+<!doctype html>
+<!--[if lt IE 7]>      <html lang="pl" class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html lang="pl" class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html lang="pl" class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html lang="pl" class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex">
+        <title>Shinden</title>
+        <!-- <meta name="description" content=""> -->
+        <meta http-equiv="X-UA-Compatible" content="IE=10; IE=9; IE=8; IE=7; IE=EDGE" />
+        <link rel="Shortcut icon" href="/favicon.gif">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="/f/userlist/css/common.css">
+        <link rel="stylesheet" href="/f/userlist/css/list.css">
+        <link rel="stylesheet" href="/f/css/jquery.confirm.css">
+        <link rel="stylesheet" href="/f/css/jquery.rateit.css">
+        <link rel="stylesheet" href="/f/css/jquery.qtip.min.css">
+        <link rel="stylesheet" href="/res/other/userlists/anime/default.css?v=1416811704?">
+        <script type="text/javascript">
+            var _Storage = new Object();
+            _Storage.APIService = '/api';
+            _Storage.listUserId = 624951;
+            _Storage.lang = 'pl';
+
+
+        </script>
+
+    </head>
+    <body class="animelist  list-all">
+                <header>
+            <div class="userspace-center">
+                  <nav role="navigation">
+                      <div id="logo">
+                    </div>
+                    <ul>
+                        <li><a href="/"><i class="fa fa-fw fa-home"></i>shinden.pl</a></li>
+                        <li class="active "><a href="/animelist">Lista Anime</a></li>
+                        <li class=""><a href="/mangalist">Lista Mang</a></li>
+                        <li><a href="/series">Spis Anime</a></li>
+                        <li><a href="/manga">Spis Mang</a></li>
+                        <li><a href="/user/624951-sebas766"><i class="fa fa-user"></i> Sebas766</a></li>
+
+                        <li class=" nav-right"><a href="/animelist/logic_settings"><i class="fa fa-fw fa-cog"></i> Ustawienia</a></li>    
+                                                    <li class="nav-right">
+                                <form method="GET" class="nav-search">
+                                <input type="text" name="search" placeholder="Szukaj na liście" />
+                                <button type="submit"><i class="fa fa-search"></i></button>
+                                </form>
+                            </li>
+                                                            
+                    </ul>
+                </nav>        
+              </div>
+          </header>
+
+
+
+
+        <div id="container" class="all-statuses">
+
+
+            <script type="text/html" id="user_rates_tmpl">
+    <h4>Moje oceny:</h4>
+                <% if(data.hasOwnProperty('total')) { %>
+            <div class="rate-stars">
+                <span class="rate-text  ">Ogólna:</span>
+                <div class="rateit" data-rateit-starwidth="17" data-rateit-value="<%=data.total%>"  data-rateit-min="0" data-rateit-max="10" data-rateit-readonly="true"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('story')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Fabuła:</span>
+                <div class="rateit" data-rateit-starwidth="17" data-rateit-value="<%=data.story%>"  data-rateit-min="0" data-rateit-max="10" data-rateit-readonly="true"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('graphics')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Grafika:</span>
+                <div class="rateit" data-rateit-starwidth="17" data-rateit-value="<%=data.graphics%>"  data-rateit-min="0" data-rateit-max="10" data-rateit-readonly="true"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('music')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Muzyka:</span>
+                <div class="rateit" data-rateit-starwidth="17" data-rateit-value="<%=data.music%>"  data-rateit-min="0" data-rateit-max="10" data-rateit-readonly="true"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('lines')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Kreska:</span>
+                <div class="rateit" data-rateit-starwidth="17" data-rateit-value="<%=data.lines%>"  data-rateit-min="0" data-rateit-max="10" data-rateit-readonly="true"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('titlecahracters')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Postacie:</span>
+                <div class="rateit" data-rateit-starwidth="17" data-rateit-value="<%=data.titlecahracters%>"  data-rateit-min="0" data-rateit-max="10" data-rateit-readonly="true"></div>
+            </div>
+            <% } %>
+    </script>
+<script type="text/html" id="title_tmpl">
+    <div class="media tooltip-media">
+        <div class="media-img">
+            <img src="<%=img_url %>"/>
+        </div>
+        <div class="media-imgExt"> 
+            <h4>Oceny tytułu:</h4>
+            <ul class="title-rating-stats stats-tabs">
+                                <% if(global_rates.hasOwnProperty('total')) {  %>
+                    <li><%=global_rates.total %> <span>Ogólna</span></li>
+                <% } %>
+                                <% if(global_rates.hasOwnProperty('story')) {  %>
+                    <li><%=global_rates.story %> <span>Fabuła</span></li>
+                <% } %>
+                                <% if(global_rates.hasOwnProperty('graphics')) {  %>
+                    <li><%=global_rates.graphics %> <span>Grafika</span></li>
+                <% } %>
+                                <% if(global_rates.hasOwnProperty('music')) {  %>
+                    <li><%=global_rates.music %> <span>Muzyka</span></li>
+                <% } %>
+                                <% if(global_rates.hasOwnProperty('lines')) {  %>
+                    <li><%=global_rates.lines %> <span>Kreska</span></li>
+                <% } %>
+                                <% if(global_rates.hasOwnProperty('titlecahracters')) {  %>
+                    <li><%=global_rates.titlecahracters %> <span>Postacie</span></li>
+                <% } %>
+                            </ul>        
+        </div>
+        <div class="media-bd">
+            <div class="user-rates"> </div>
+        </div>
+    </div>
+</script>
+
+
+
+<script type="text/html" id="add_to_list_tmpl">
+    <div class="tipsy tipsy-t" style="top: 690px; left: 555px; visibility: visible; display: block; opacity: 1;"><div class="tipsy-arrow tipsy-arrow-w"></div><div class="tipsy-inner"><span id="actionTip" class="action-tip">
+  <ul class="data-view-list">
+        <li>
+        <a data-id="<%=title_id%>" data-type="in progress" class="button status_in_progress" href="#">
+            <figure>
+                <i class="fa fa-fw fa-plus-circle fa-3x"></i>
+                <figcaption>Oglądam</figcaption>
+            </figure>
+        </a>
+      </li>
+          <li>
+        <a data-id="<%=title_id%>" data-type="completed" class="button status_completed" href="#">
+            <figure>
+                <i class="fa fa-fw fa-check-circle fa-3x"></i>
+                <figcaption>Obejrzane</figcaption>
+            </figure>
+        </a>
+      </li>
+          <li>
+        <a data-id="<%=title_id%>" data-type="skip" class="button status_skip" href="#">
+            <figure>
+                <i class="fa fa-fw fa-ban fa-3x"></i>
+                <figcaption>Pomijam</figcaption>
+            </figure>
+        </a>
+      </li>
+          <li>
+        <a data-id="<%=title_id%>" data-type="hold" class="button status_hold" href="#">
+            <figure>
+                <i class="fa fa-fw fa-meh-o fa-3x"></i>
+                <figcaption>Wstrzymane</figcaption>
+            </figure>
+        </a>
+      </li>
+          <li>
+        <a data-id="<%=title_id%>" data-type="dropped" class="button status_dropped" href="#">
+            <figure>
+                <i class="fa fa-fw fa-trash-o fa-3x"></i>
+                <figcaption>Porzucone</figcaption>
+            </figure>
+        </a>
+      </li>
+          <li>
+        <a data-id="<%=title_id%>" data-type="plan" class="button status_plan" href="#">
+            <figure>
+                <i class="fa fa-fw fa-pencil  fa-3x"></i>
+                <figcaption>Planuję</figcaption>
+            </figure>
+        </a>
+      </li>
+      
+  </ul>
+</span></div></div>
+</script><script type="text/html" id="episodes_tmpl">
+    <form method="POST" class="form-vertical episodes-form">
+            <fieldset class="episodes_range">
+                <legend>Zakres odcinków:</legend>
+                <label>Od <input type="text" name="from" placeholder="<%=min_no %>" /></label>
+                <label>Do <input type="text" name="to" placeholder="<%=max_no %>" /></label>
+            </fieldset>
+
+            <fieldset>
+                <legend>Sposób uzupełnienia:</legend>
+                <label><input type="radio" name="method" value="update" checked /> Dodaj tylko te których nie mam na liście </label>
+                <label><input type="radio" name="method" value="add" /> Zsumuj ilość obejrzeń z moja listą </label>
+            </fieldset>
+
+            <fieldset>
+                <legend>Opcje dodatkowe:</legend>
+                <label>Nie dodawaj filerów<input type="checkbox" name="ignore_fillers" /></label>
+            </fieldset>
+            <input type="hidden" name="title_id" value="<%=title_id %>" />
+            <button id="episode-form-close">Zamknij</button>
+            <button type="submit" id="episode-submit">Dodaj</button>
+    </form>
+</script>
+
+
+<script type="text/html" id="episodes_tmpl_old">
+    <table class="list-episode-checkboxes">
+        <thead>
+        <th>Lp.</th>
+        <th>Title</th>
+        <th class="ep-saw"><a href="#" class="add-list-episode-all"><i class="fa fa-fw fa-check-square-o"></i></a></th>
+    </thead>
+    <tbody>
+        <% var watched = ""; var j=0; for(var i in episodes) {  j++;%>
+        <tr>
+            <td><%=episodes[i]['episode_no'] %> </td>
+            <td><%=episodes[i]['episode_title'] %> </td>
+            <td><a href="#" class="add-list-episode" data-id="<%= episodes[i]['episode_id'] %>">
+                    <i class="fa <% if(episodes[i]['view_cnt'] > 0) { watched += String(episodes[i]['episode_id']) + ";";  %> fa-check-square-o <% } else { %> fa-square-o <% } %>"></i></a></td>
+            <td> </td>
+        </tr>
+        <% } %>
+    </tbody>
+</table>
+
+    <% if(j > 0) { %>
+    <input type="hidden" id="eps_watched" value="<%= watched %>" />
+    <button id="saveWatchedEpisodes" data-title="<%=episodes[0]['episode_title'] %>">Zapisz oznaczone jako obejrzane <i class="fa fa-fw fa-eye"></i></button>
+    <% } %>
+    <button class="episodes_edit_close">Close</button>
+</script>
+
+
+<!-- Add content to the popup -->
+<div id="episodes_edit" class="well box">
+
+    <h2> <i class="fa fa-fw fa-pencil-square-o"></i>Edytuj Odcinki <span href="#" id="episodes_edit_title">Tytuł Anime</span></h2>
+    <div class="well-data" id="episode_edit_container">
+        <i class="fa fa-fw fa-3x fa-spinner fa-spin"></i>
+    </div>
+
+
+</div>
+<script type="text/html" id="title_rates_tmpl">
+    
+                <% if(data.hasOwnProperty('total')) { %>
+            <div class="rate-stars">
+                <span class="rate-text  ">Ogólna:</span>
+                <div class="rateit" data-type = "total" data-title-type="anime" data-title-id ="<%=title_id %>" data-rateit-step="1" data-rateit-resetable="false" data-rateit-starwidth="17" data-rateit-value="<%=data.total%>"  data-rateit-min="0" data-rateit-max="10"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('story')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Fabuła:</span>
+                <div class="rateit" data-type = "story" data-title-type="anime" data-title-id ="<%=title_id %>" data-rateit-step="1" data-rateit-resetable="false" data-rateit-starwidth="17" data-rateit-value="<%=data.story%>"  data-rateit-min="0" data-rateit-max="10"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('graphics')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Grafika:</span>
+                <div class="rateit" data-type = "graphics" data-title-type="anime" data-title-id ="<%=title_id %>" data-rateit-step="1" data-rateit-resetable="false" data-rateit-starwidth="17" data-rateit-value="<%=data.graphics%>"  data-rateit-min="0" data-rateit-max="10"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('music')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Muzyka:</span>
+                <div class="rateit" data-type = "music" data-title-type="anime" data-title-id ="<%=title_id %>" data-rateit-step="1" data-rateit-resetable="false" data-rateit-starwidth="17" data-rateit-value="<%=data.music%>"  data-rateit-min="0" data-rateit-max="10"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('lines')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Kreska:</span>
+                <div class="rateit" data-type = "lines" data-title-type="anime" data-title-id ="<%=title_id %>" data-rateit-step="1" data-rateit-resetable="false" data-rateit-starwidth="17" data-rateit-value="<%=data.lines%>"  data-rateit-min="0" data-rateit-max="10"></div>
+            </div>
+            <% } %>
+                <% if(data.hasOwnProperty('titlecahracters')) { %>
+            <div class="rate-stars">
+                <span class="rate-text rate-inner ">Postacie:</span>
+                <div class="rateit" data-type = "titlecahracters" data-title-type="anime" data-title-id ="<%=title_id %>" data-rateit-step="1" data-rateit-resetable="false" data-rateit-starwidth="17" data-rateit-value="<%=data.titlecahracters%>"  data-rateit-min="0" data-rateit-max="10"></div>
+            </div>
+            <% } %>
+    </script>
+
+<script type="text/html" id="title_data_tmpl">
+    <form action="/" class="form-full">
+
+
+        <fieldset>
+            <label for="gender">Ustaw status:</label>
+            <select name="title_status">
+<option value="in progress">Oglądam</option>
+<option value="completed">Obejrzane</option>
+<option value="skip">Pomijam</option>
+<option value="hold">Wstrzymane</option>
+<option value="dropped">Porzucone</option>
+<option value="plan">Planuję</option>
+</select>        </fieldset>
+        <!--
+        <fieldset class="check">
+            <label><input type="checkbox" />Umieść w ulubionych</label>
+        </fieldset>
+        -->
+        
+    </form>            
+    <button id="saveTitleData" data-title="">Zapisz <i class="fa fa-fw fa-eye"></i></button>
+</script>
+
+<!-- Add content to the popup -->
+<div id="title_edit" class="well box">
+
+    <h2> <i class="fa fa-fw fa-pencil-square-o"></i>Dodaj <span id="title_edit_title">Tytul Anime</span> do swojej listy</h2>
+    <h4 id="title_edit_container_title">Podstawowe informacje:</h4>
+    <div class="well-data" id="title_edit_container">
+        <i class="fa fa-fw fa-3x fa-spinner fa-spin"></i>
+    </div>
+    <h4>Moje oceny:</h4>
+    <div class="well-data" id="title_rate_edit_container">
+        <i class="fa fa-fw fa-3x fa-spinner fa-spin"></i>
+    </div>
+
+</div>
+<nav class="watched_status"><ul>
+            <li class="in progress"><a class="button" href="/animelist/624951-sebas766/in-progress">Oglądam</a></li>
+            <li class="completed"><a class="button" href="/animelist/624951-sebas766/completed">Obejrzane</a></li>
+            <li class="skip"><a class="button" href="/animelist/624951-sebas766/skip">Pomijam</a></li>
+            <li class="hold"><a class="button" href="/animelist/624951-sebas766/hold">Wstrzymane</a></li>
+            <li class="dropped"><a class="button" href="/animelist/624951-sebas766/dropped">Porzucone</a></li>
+            <li class="plan"><a class="button" href="/animelist/624951-sebas766/plan">Planuję</a></li>
+        <li class="all"><a class="button active" href="/animelist/624951-sebas766/all">Wszystkie anime</a></li>
+</ul></nav>
+
+<section class="list-content">
+<div class="background"></div>
+                        <h3 class="section-title-list section-in-progress"><span>Oglądam:</span></h3>
+            <table class="title-list section-in-progress" id="ver-zebra">
+            <thead>
+            <tr class="list-table-header">
+                              <th class="col-lp">Lp.</th>
+                              <th class="col-title">Tytuł</th>
+                              <th class="col-rating rate total">Ogólna</th>
+                              <th class="col-status">Status</th>
+                              <th class="col-progress">Postęp</th>
+                              <th class="col-type">Typ</th>
+                          </tr>
+            </thead>
+            <tbody>
+                        <tr class="title-row title-59480" id="title-59480" data-title-id="59480"  data-attrs='{"global_rates":{"total":5.92,"story":5.84,"graphics":6.58,"music":5.76,"titlecahracters":6.05},"img_url":"\/res\/images\/100x100\/355765.jpg"}' >
+
+                <td>1</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/59480-noumin-kanren-no-skill-bakka-agetetara-naze-ka-tsuyoku-natta" class="show-info" >Noumin Kanren no Skill Bakka Agetetara Naze ka Tsuyoku Natta.</a></td><td class="rate total">?</td><td>Oglądam</td><td><span id="episodes_counter_title_59480">0</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-44158" id="title-44158" data-title-id="44158"  data-attrs='{"global_rates":{"total":8.54,"story":8.56,"graphics":8.33,"music":8.29,"titlecahracters":8.7},"img_url":"\/res\/images\/100x100\/184230.jpg"}' >
+
+                <td>2</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/44158-overlord" class="show-info" >Overlord</a></td><td class="rate total">?</td><td>Oglądam</td><td><span id="episodes_counter_title_44158">1</span>/13
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-58276" id="title-58276" data-title-id="58276"  data-attrs='{"global_rates":{"total":7,"story":7.14,"graphics":7.3,"music":6.55,"titlecahracters":7.12},"img_url":"\/res\/images\/100x100\/333199.jpg"}' >
+
+                <td>3</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/58276-saihate-no-paladin" class="show-info" >Saihate no Paladin</a></td><td class="rate total">?</td><td>Oglądam</td><td><span id="episodes_counter_title_58276">3</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-68790" id="title-68790" data-title-id="68790"  data-attrs='{"global_rates":{"total":6.78,"story":7.25,"graphics":6.45,"music":6.46,"titlecahracters":7.11},"img_url":"\/res\/images\/100x100\/408579.jpg"}' >
+
+                <td>4</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/68790-saikyou-no-ousama-nidome-no-jinsei-wa-nani-wo-suru" class="show-info" >Saikyou no Ousama, Nidome no Jinsei wa Nani wo Suru?</a></td><td class="rate total">?</td><td>Oglądam</td><td><span id="episodes_counter_title_68790">2</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-68893" id="title-68893" data-title-id="68893"  data-attrs='{"global_rates":{"total":7.2,"story":7.29,"graphics":7.43,"music":6.57,"titlecahracters":7.3},"img_url":"\/res\/images\/100x100\/440714.jpg"}' >
+
+                <td>5</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/68893-shinjiteita-nakama-tachi-ni-dungeon-okuchi-de-korosarekaketa-ga-gift-mugen-gacha-de-level-9999-no-nakama-tachi-wo-te-ni-irete-moto-party-member-to-sekai-ni-fukushuu-zamaa-shimasu" class="show-info" >Shinjiteita Nakama-tachi ni Dungeon Okuchi de Korosarekaketa ga Gift "Mugen Gacha" de Level 9999 no Nakama-tachi wo Te ni Irete Moto Party Member to Sekai ni Fukushuu & "Zamaa!" Shimasu!</a></td><td class="rate total">?</td><td>Oglądam</td><td><span id="episodes_counter_title_68893">0</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-67918" id="title-67918" data-title-id="67918"  data-attrs='{"global_rates":{"total":7.68,"story":7.64,"graphics":7.98,"music":7.23,"titlecahracters":7.76},"img_url":"\/res\/images\/100x100\/434754.jpg"}' >
+
+                <td>6</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/67918-tensei-shitara-dainana-ouji-datta-node-kimama-ni-majutsu-wo-kiwamemasu-2nd-season" class="show-info" >Tensei shitara Dainana Ouji Datta node, Kimama ni Majutsu wo Kiwamemasu 2nd Season</a></td><td class="rate total">?</td><td>Oglądam</td><td><span id="episodes_counter_title_67918">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        </tbody>
+            </table>
+                                <h3 class="section-title-list section-completed"><span>Obejrzane:</span></h3>
+            <table class="title-list section-completed" id="ver-zebra">
+            <thead>
+            <tr class="list-table-header">
+                              <th class="col-lp">Lp.</th>
+                              <th class="col-title">Tytuł</th>
+                              <th class="col-rating rate total">Ogólna</th>
+                              <th class="col-status">Status</th>
+                              <th class="col-progress">Postęp</th>
+                              <th class="col-type">Typ</th>
+                          </tr>
+            </thead>
+            <tbody>
+                        <tr class="title-row title-57684" id="title-57684" data-title-id="57684"  data-attrs='{"global_rates":{"total":6.71,"story":6.44,"graphics":7.56,"music":6.4,"titlecahracters":6.97},"img_url":"\/res\/images\/100x100\/350762.jpg"}' >
+
+                <td>1</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/57684-isekai-meikyuu-de-harem-wo" class="show-info" >Isekai Meikyuu de Harem wo</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_57684">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-67948" id="title-67948" data-title-id="67948"  data-attrs='{"global_rates":{"total":6.68,"story":6.87,"graphics":6.81,"music":6.48,"titlecahracters":6.81},"img_url":"\/res\/images\/100x100\/419822.jpg"}' >
+
+                <td>2</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/67948-isekai-mokushiroku-mynoghra-hametsu-no-bunmei-de-hajimeru-sekai-seifuku" class="show-info" >Isekai Mokushiroku Mynoghra: Hametsu no Bunmei de Hajimeru Sekai Seifuku</a></td><td class="rate total">7</td><td>Obejrzane</td><td><span id="episodes_counter_title_67948">13</span>/13
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-59686" id="title-59686" data-title-id="59686"  data-attrs='{"global_rates":{"total":7.77,"story":7.69,"graphics":8.03,"music":7.26,"titlecahracters":7.86},"img_url":"\/res\/other\/placeholders\/title\/100x100.jpg"}' >
+
+                <td>3</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/titles/59686-isekai-nonbiri-nouka" class="show-info" >Isekai Nonbiri Nouka</a></td><td class="rate total">10</td><td>Obejrzane</td><td><span id="episodes_counter_title_59686">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-67409" id="title-67409" data-title-id="67409"  data-attrs='{"global_rates":{"total":7.14,"story":7.2,"graphics":7.45,"music":6.61,"titlecahracters":7.26},"img_url":"\/res\/images\/100x100\/411278.jpg"}' >
+
+                <td>4</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/67409-isshun-de-chiryou-shiteita-noni-yakutatazu-to-tsuihou-sareta-tensai-chiyushi-yami-healer-toshite-tanoshiku-ikiru" class="show-info" >Isshun de Chiryou shiteita noni Yakutatazu to Tsuihou sareta Tensai Chiyushi, Yami Healer toshite Tanoshiku Ikiru</a></td><td class="rate total">9</td><td>Obejrzane</td><td><span id="episodes_counter_title_67409">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-58045" id="title-58045" data-title-id="58045"  data-attrs='{"global_rates":{"total":8.62,"story":8.59,"graphics":8.76,"music":8.23,"titlecahracters":8.67},"img_url":"\/res\/images\/100x100\/350786.jpg"}' >
+
+                <td>5</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/58045-kage-no-jitsuryokusha-ni-naritakute" class="show-info" >Kage no Jitsuryokusha ni Naritakute!</a></td><td class="rate total">10</td><td>Obejrzane</td><td><span id="episodes_counter_title_58045">20</span>/20
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-63965" id="title-63965" data-title-id="63965"  data-attrs='{"global_rates":{"total":8.63,"story":8.55,"graphics":8.81,"music":8.23,"titlecahracters":8.73},"img_url":"\/res\/images\/100x100\/372035.jpg"}' >
+
+                <td>6</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/63965-kage-no-jitsuryokusha-ni-naritakute-2nd-season" class="show-info" >Kage no Jitsuryokusha ni Naritakute! 2nd Season</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_63965">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-59477" id="title-59477" data-title-id="59477"  data-attrs='{"global_rates":{"total":7.49,"story":7.57,"graphics":7.36,"music":6.95,"titlecahracters":7.71},"img_url":"\/res\/images\/100x100\/351539.jpg"}' >
+
+                <td>7</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/59477-kuro-no-shoukanshi" class="show-info" >Kuro no Shoukanshi</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_59477">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-59866" id="title-59866" data-title-id="59866"  data-attrs='{"global_rates":{"total":6.23,"story":6.17,"graphics":6.63,"music":5.94,"titlecahracters":6.36},"img_url":"\/res\/images\/100x100\/376894.jpg"}' >
+
+                <td>8</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/59866-level-1-dakedo-unique-skill-de-saikyou-desu" class="show-info" >Level 1 Dakedo Unique Skill de Saikyou Desu</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_59866">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-69367" id="title-69367" data-title-id="69367"  data-attrs='{"global_rates":{"total":7.22,"story":7.23,"graphics":7.4,"music":6.76,"titlecahracters":7.33},"img_url":"\/res\/images\/100x100\/418522.jpg"}' >
+
+                <td>9</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/69367-mizu-zokusei-no-mahoutsukai" class="show-info" >Mizu Zokusei no Mahoutsukai</a></td><td class="rate total">6</td><td>Obejrzane</td><td><span id="episodes_counter_title_69367">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-59768" id="title-59768" data-title-id="59768"  data-attrs='{"global_rates":{"total":7.77,"story":7.96,"graphics":7.71,"music":7.12,"titlecahracters":7.88},"img_url":"\/res\/images\/100x100\/378156.jpg"}' >
+
+                <td>10</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/59768-nozomanu-fushi-no-boukensha" class="show-info" >Nozomanu Fushi no Boukensha</a></td><td class="rate total">8</td><td>Obejrzane</td><td><span id="episodes_counter_title_59768">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-67562" id="title-67562" data-title-id="67562"  data-attrs='{"global_rates":{"total":9.24,"story":9.13,"graphics":9.38,"music":8.91,"titlecahracters":9.1},"img_url":"\/res\/images\/100x100\/405829.jpg"}' >
+
+                <td>11</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/67562-ore-dake-level-up-na-ken-season-2-arise-from-the-shadow" class="show-info" >Ore dake Level Up na Ken Season 2: Arise from the Shadow</a></td><td class="rate total">10</td><td>Obejrzane</td><td><span id="episodes_counter_title_67562">13</span>/13
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-64525" id="title-64525" data-title-id="64525"  data-attrs='{"global_rates":{"total":6.69,"story":6.65,"graphics":7.24,"music":6.33,"titlecahracters":6.88},"img_url":"\/res\/images\/100x100\/374515.jpg"}' >
+
+                <td>12</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/64525-oroka-na-tenshi-wa-akuma-to-odoru" class="show-info" >Oroka na Tenshi wa Akuma to Odoru</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_64525">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-58091" id="title-58091" data-title-id="58091"  data-attrs='{"global_rates":{"total":6.61,"story":6.6,"graphics":7.29,"music":6.29,"titlecahracters":6.72},"img_url":"\/res\/images\/100x100\/345586.jpg"}' >
+
+                <td>13</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/58091-shijou-saikyou-no-daimaou-murabito-a-ni-tensei-suru" class="show-info" >Shijou Saikyou no Daimaou, Murabito A ni Tensei Suru</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_58091">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-12710" id="title-12710" data-title-id="12710"  data-attrs='{"global_rates":{"total":8.35,"story":8.46,"graphics":8.57,"music":8.15,"titlecahracters":8.37},"img_url":"\/res\/images\/100x100\/171863.jpg"}' >
+
+                <td>14</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/12710-sword-art-online" class="show-info" >Sword Art Online</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_12710">25</span>/25
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-60500" id="title-60500" data-title-id="60500"  data-attrs='{"global_rates":{"total":7.13,"story":7.1,"graphics":7.51,"music":6.58,"titlecahracters":7.2},"img_url":"\/res\/images\/100x100\/354534.jpg"}' >
+
+                <td>15</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/60500-tensei-kizoku-no-isekai-boukenroku-jichou-wo-shiranai-kamigami-no-shito" class="show-info" >Tensei Kizoku no Isekai Boukenroku: Jichou wo Shiranai Kamigami no Shito</a></td><td class="rate total">7</td><td>Obejrzane</td><td><span id="episodes_counter_title_60500">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-35670" id="title-35670" data-title-id="35670"  data-attrs='{"global_rates":{"total":7.87,"story":7.82,"graphics":8.1,"music":7.39,"titlecahracters":8.22},"img_url":"\/res\/images\/100x100\/171563.jpg"}' >
+
+                <td>16</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/35670-trinity-seven" class="show-info" >Trinity Seven</a></td><td class="rate total">?</td><td>Obejrzane</td><td><span id="episodes_counter_title_35670">12</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        </tbody>
+            </table>
+                                                                    <h3 class="section-title-list section-plan"><span>Planuję:</span></h3>
+            <table class="title-list section-plan" id="ver-zebra">
+            <thead>
+            <tr class="list-table-header">
+                              <th class="col-lp">Lp.</th>
+                              <th class="col-title">Tytuł</th>
+                              <th class="col-rating rate total">Ogólna</th>
+                              <th class="col-status">Status</th>
+                              <th class="col-progress">Postęp</th>
+                              <th class="col-type">Typ</th>
+                          </tr>
+            </thead>
+            <tbody>
+                        <tr class="title-row title-68500" id="title-68500" data-title-id="68500"  data-attrs='{"global_rates":{"total":5.45,"story":5.33,"graphics":6.54,"music":5.5,"titlecahracters":5.77},"img_url":"\/res\/images\/100x100\/414184.jpg"}' >
+
+                <td>1</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/68500-chotto-dake-ai-ga-omoi-dark-elf-ga-isekai-kara-oikaketekita" class="show-info" >Chotto dake Ai ga Omoi Dark Elf ga Isekai kara Oikaketekita</a></td><td class="rate total">?</td><td>Planuję</td><td><span id="episodes_counter_title_68500">0</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        <tr class="title-row title-68784" id="title-68784" data-title-id="68784"  data-attrs='{"global_rates":{"total":6.11,"story":6.07,"graphics":6.69,"music":5.85,"titlecahracters":6.06},"img_url":"\/res\/images\/100x100\/408578.jpg"}' >
+
+                <td>2</td><td class="title-tooltip title-col">
+                     <a data-type="anime" href="/series/68784-kanchigai-no-atelier-meister-eiyuu-party-no-moto-zatsuyougakari-ga-jitsu-wa-sentou-igai-ga-sss-rank-datta-to-iu-yoku-aru-hanashi" class="show-info" >Kanchigai no Atelier Meister: Eiyuu Party no Moto Zatsuyougakari ga, Jitsu wa Sentou Igai ga SSS Rank Datta to Iu Yoku Aru Hanashi</a></td><td class="rate total">?</td><td>Planuję</td><td><span id="episodes_counter_title_68784">0</span>/12
+                </td><td>TV</td>
+
+
+                        </tr>
+                        </tbody>
+            </table>
+        </section>        </div>
+                <footer>
+            <div class="userspace-center">
+                <a href="/">Shinden.pl</a> 2026            </div>
+        </footer>
+
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script>window.jQuery || document.write('<script src="/f/js/vendor/jquery-1.10.2.min.js"><\/script>');</script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.29.5/js/jquery.tablesorter.min.js"></script>
+        <script src="/f/js/vendor/jquery.tmpl.js"></script>
+        <script src="/f/js/vendor/jquery.jeditable.js"></script>
+        <script src="/f/js/vendor/jquery-timeago/jquery.timeago.js"></script>
+        <script src="/f/js/vendor/jquery-timeago/pl.js"></script>
+        <script src="/f/js/vendor/jquery.rateit.min.js"></script>
+        <script src="/f/js/vendor/jquery.qtip.min.js"></script>
+        <script src="/f/js/vendor/jquery.popupoverlay.js"></script>
+        <script src="/f/js/vendor/jquery.confirm.js"></script>
+        <script src="/f/js/vendor/jquery.float-thead.min.js"></script>
+        <script src="/f/userlist/js/list.js?v1"></script>
+    <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a423cb8caa54cc60',t:'MTc5MDYwOTQ4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
