@@ -96,7 +96,10 @@ public sealed class SyncService
     {
         if (config is null || !IsStatusEnabled(config, item.Status))
         {
-            return new SyncItem(item.Title, item.Status, SyncOutcome.Skipped, "status disabled in configuration");
+            const string detail = "status disabled in configuration";
+            return new SyncItem(
+                item.Title, item.Status, SyncOutcome.Skipped, detail, item.Url, null,
+                ErrorHints.ForDetail(SyncOutcome.Skipped, detail));
         }
 
         try
@@ -104,35 +107,45 @@ public sealed class SyncService
             var media = await _metadata.ResolveAsync(item, cancellationToken).ConfigureAwait(false);
             if (media is null)
             {
-                return new SyncItem(item.Title, item.Status, SyncOutcome.Skipped, "unrecognized title");
+                const string detail = "unrecognized title";
+                return new SyncItem(
+                    item.Title, item.Status, SyncOutcome.Skipped, detail, item.Url, null,
+                    ErrorHints.ForDetail(SyncOutcome.Skipped, detail));
             }
+
+            var aniListUrl = "https://anilist.co/anime/" + media.AniListId;
 
             // Lazy.Value with bad Arr configuration throws a readable exception → Failed (caught below).
             var arr = SelectArr(media.Type, config);
             if (arr is null)
             {
-                return new SyncItem(item.Title, item.Status, SyncOutcome.Skipped, "Sonarr/Radarr disabled");
+                const string detail = "Sonarr/Radarr disabled";
+                return new SyncItem(
+                    item.Title, item.Status, SyncOutcome.Skipped, detail, item.Url, aniListUrl,
+                    ErrorHints.ForDetail(SyncOutcome.Skipped, detail));
             }
 
             if (await arr.ExistsAsync(media, cancellationToken).ConfigureAwait(false))
             {
-                return new SyncItem(item.Title, item.Status, SyncOutcome.AlreadyExists, null);
+                return new SyncItem(item.Title, item.Status, SyncOutcome.AlreadyExists, null, item.Url, aniListUrl);
             }
 
             if (config.DryRun)
             {
                 _logger.LogInformation(
                     "AniBridge (dry run): would add {Title} to {Arr}.", item.Title, arr.Name);
-                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, arr.Name);
+                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, arr.Name, item.Url, aniListUrl);
             }
 
             await arr.AddAsync(media, item.Status, cancellationToken).ConfigureAwait(false);
-            return new SyncItem(item.Title, item.Status, SyncOutcome.Added, null);
+            return new SyncItem(item.Title, item.Status, SyncOutcome.Added, null, item.Url, aniListUrl);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "AniBridge: sync error {Title}.", item.Title);
-            return new SyncItem(item.Title, item.Status, SyncOutcome.Failed, ex.Message);
+            return new SyncItem(
+                item.Title, item.Status, SyncOutcome.Failed, ex.Message, item.Url, null,
+                ErrorHints.ForDetail(SyncOutcome.Failed, ex.Message));
         }
     }
 

@@ -1,0 +1,69 @@
+<div id="AniBridgeOverviewPage" data-role="page" class="page type-interior pluginConfigurationPage"
+    data-require="emby-button">
+    <div data-role="content">
+        <div class="content-primary">
+            <div class="fieldDescription">AniBridge:
+                <a href="#" onclick="aniBridgeNav('AniBridge');return false;">Overview</a> &#183;
+                <a href="#" onclick="aniBridgeNav('AniBridge Shinden');return false;">Shinden</a> &#183;
+                <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
+                <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
+            </div>
+            <h3 class="sectionTitle">AniBridge setup</h3>
+            <div class="fieldDescription">Flow: Shinden → AniBridge → AniList → Sonarr/Radarr → Jellyfin. Nothing is ever deleted.</div>
+            <div id="AniBridgeOvBanner" class="fieldDescription" style="font-weight:bold;"></div>
+            <div id="AniBridgeOvChecklist" class="fieldDescription">Loading…</div>
+            <div id="AniBridgeOvHint" class="fieldDescription"></div>
+            <div style="display:flex;gap:0.5em;flex-wrap:wrap;margin:1em 0;">
+                <button is="emby-button" type="button" class="raised emby-button" onclick="aniBridgeNav('AniBridge Shinden');return false;"><span>1 · Shinden</span></button>
+                <button is="emby-button" type="button" class="raised emby-button" onclick="aniBridgeNav('AniBridge Sonarr');return false;"><span>2 · Sonarr</span></button>
+                <button is="emby-button" type="button" class="raised emby-button" onclick="aniBridgeNav('AniBridge Radarr');return false;"><span>3 · Radarr</span></button>
+            </div>
+            <h3 class="sectionTitle">Last sync</h3>
+            <div class="fieldDescription" id="AniBridgeOvLastSync">Loading…</div>
+            <div class="fieldDescription">Details live on the Shinden page (search, filters, per-title hints).</div>
+        </div>
+    </div>
+    <script type="text/javascript">
+        (function () {
+            function nav(page) {
+                if (window.Dashboard && Dashboard.navigate) {
+                    Dashboard.navigate('configurationpage?name=' + encodeURIComponent(page));
+                }
+            }
+            window.aniBridgeNav = nav;
+
+            function tick(ok) { return ok ? '✓' : '✗'; }
+
+            document.querySelector('#AniBridgeOverviewPage').addEventListener('pageshow', function () {
+                var list = document.querySelector('#AniBridgeOvChecklist');
+                var hint = document.querySelector('#AniBridgeOvHint');
+                var banner = document.querySelector('#AniBridgeOvBanner');
+                var last = document.querySelector('#AniBridgeOvLastSync');
+                list.textContent = 'Loading…';
+                ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
+                    .then(function (s) {
+                        list.textContent = 'Shinden ' + tick(s.shindenOk) + '  ·  Sonarr ' + tick(s.sonarrOk) +
+                            '  ·  Radarr ' + tick(s.radarrOk);
+                        hint.textContent = s.hint || '';
+                        banner.textContent = s.dryRun
+                            ? 'DRY RUN is ON — nothing is added to Sonarr/Radarr yet.'
+                            : 'LIVE mode — sync adds to Sonarr/Radarr.';
+                    }, function () {
+                        list.textContent = 'Could not load status.';
+                    });
+                last.textContent = 'Loading…';
+                ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/last-sync'), dataType: 'json' })
+                    .then(function (report) {
+                        var r = report.result || {};
+                        var when = report.finishedAt ? new Date(report.finishedAt).toLocaleString() : 'unknown time';
+                        var parts = ['Scanned', 'Added', 'AlreadyExists', 'Skipped', 'Failed', 'WouldAdd']
+                            .map(function (k) { return k + ': ' + (r[k.charAt(0).toLowerCase() + k.slice(1)] || 0); });
+                        last.textContent = (report.dryRun ? '(dry run) ' : '') + 'Finished ' + when + ' — ' + parts.join(' · ') +
+                            (report.error ? ' — FAILED: ' + report.error : '');
+                    }, function () {
+                        last.textContent = 'No sync has run yet.';
+                    });
+            });
+        })();
+    </script>
+</div>

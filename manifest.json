@@ -8,6 +8,14 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.3.0.0",
+        "changelog": "UX overhaul: Overview page, Test buttons, live sync status with auto-refresh, searchable report with history and per-title links/hints.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.3.0/anibridge_0.3.0.zip",
+        "checksum": "7fa121c59cc16e1aea557727a577ca40",
+        "timestamp": "2026-09-29 08:52:24"
+      },
+      {
         "version": "0.2.1.0",
         "changelog": "Settings page navigation, failed-sync report with error message.",
         "targetAbi": "12.1.0.0",

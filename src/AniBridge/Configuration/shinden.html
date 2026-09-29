@@ -3,10 +3,13 @@
     <div data-role="content">
         <div class="content-primary">
             <div class="fieldDescription">AniBridge:
+                <a href="#" onclick="aniBridgeNav('AniBridge');return false;">Overview</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Shinden');return false;">Shinden</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
             </div>
+            <div class="fieldDescription" id="AniBridgeChecklist">Loading status…</div>
+            <div class="fieldDescription" id="AniBridgeModeBanner" style="font-weight:bold;"></div>
             <form id="AniBridgeShindenForm">
                 <h3 class="sectionTitle">Shinden.pl</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -18,16 +21,25 @@
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ShindenUsername">Login or email</label>
                     <input id="ShindenUsername" type="text" is="emby-input" />
+                    <div class="fieldDescription" id="ShindenUsernameError" style="color:#e74c3c;"></div>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ShindenPassword">Password</label>
                     <input id="ShindenPassword" type="password" is="emby-input" autocomplete="off" />
+                    <div class="fieldDescription"><a href="#" id="ShindenShowPass">Show</a> · stored only in Jellyfin config, never logged.</div>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ShindenUserId">List ID (e.g. 420984-opzo)</label>
-                    <input id="ShindenUserId" type="text" is="emby-input" />
+                    <input id="ShindenUserId" type="text" is="emby-input" placeholder="420984-opzo" />
                     <div class="fieldDescription">Public list: https://shinden.pl/animelist/YOUR-ID (a pasted full URL works too)</div>
+                    <div class="fieldDescription" id="ShindenUserIdError" style="color:#e74c3c;"></div>
                 </div>
+                <div>
+                    <button id="AniBridgeTestShinden" is="emby-button" type="button" class="raised block emby-button">
+                        <span>Test login &amp; list</span>
+                    </button>
+                </div>
+                <div class="fieldDescription" id="AniBridgeTestResult"></div>
 
                 <h3 class="sectionTitle">Synced statuses</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -83,25 +95,238 @@
                 <div class="fieldDescription" id="AniBridgeSyncStatus"></div>
 
                 <h3 class="sectionTitle">Last sync</h3>
-                <div>
-                    <button id="AniBridgeRefreshReport" is="emby-button" type="button" class="raised block emby-button">
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap;align-items:center;margin-bottom:0.5em;">
+                    <select is="emby-select" id="AniBridgeHistorySelect" class="emby-select" style="flex:1;min-width:12em;"></select>
+                    <button id="AniBridgeRefreshReport" is="emby-button" type="button" class="raised emby-button">
                         <span>Refresh</span>
                     </button>
                 </div>
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap;margin-bottom:0.5em;">
+                    <input id="AniBridgeSearch" type="text" is="emby-input" placeholder="Search titles…" style="flex:2;min-width:10em;" />
+                    <select is="emby-select" id="AniBridgeOutcomeFilter" class="emby-select" style="flex:1;min-width:8em;">
+                        <option value="">All outcomes</option>
+                        <option value="0">Added</option>
+                        <option value="1">Already exists</option>
+                        <option value="4">Would add</option>
+                        <option value="2">Skipped</option>
+                        <option value="3">Failed</option>
+                    </select>
+                </div>
                 <div class="fieldDescription" id="AniBridgeLastSyncMeta">No sync has run yet.</div>
-                <div class="fieldDescription" id="AniBridgeLastSyncCounts"></div>
-                <h4 class="sectionTitle">Added / existing / would add</h4>
-                <ul id="AniBridgeAddedList"></ul>
-                <h4 class="sectionTitle">Skipped / failed</h4>
-                <ul id="AniBridgeSkippedList"></ul>
+                <div id="AniBridgeBadges" style="display:flex;gap:0.4em;flex-wrap:wrap;margin:0.5em 0;"></div>
+                <div class="fieldDescription" id="AniBridgeFatalHint" style="color:#e67e22;"></div>
+                <details open>
+                    <summary><strong>Added / existing / would add</strong> <span id="AniBridgeGoodCount"></span></summary>
+                    <ul id="AniBridgeAddedList"></ul>
+                </details>
+                <details open>
+                    <summary><strong>Skipped / failed</strong> <span id="AniBridgeBadCount"></span></summary>
+                    <ul id="AniBridgeSkippedList"></ul>
+                </details>
             </form>
         </div>
     </div>
     <script type="text/javascript">
         var AniBridgeShinden = {
             pluginId: 'befab610-6eca-4d99-8e12-cdb4e26114aa',
-            taskKey: 'AniBridgeDailySync'
+            taskKey: 'AniBridgeDailySync',
+            report: null,
+            pollTimer: null
         };
+
+        function aniBridgeNav(page) {
+            if (window.Dashboard && Dashboard.navigate) {
+                Dashboard.navigate('configurationpage?name=' + encodeURIComponent(page));
+            }
+        }
+
+        function aniBridgeTimeAgo(iso) {
+            if (!iso) { return 'unknown time'; }
+            var diff = Date.now() - new Date(iso).getTime();
+            if (diff < 60000) { return 'just now'; }
+            if (diff < 3600000) { return Math.floor(diff / 60000) + ' min ago'; }
+            if (diff < 86400000) { return Math.floor(diff / 3600000) + ' h ago'; }
+            return new Date(iso).toLocaleString();
+        }
+
+        function aniBridgeLoadStatus() {
+            ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
+                .then(function (s) {
+                    document.querySelector('#AniBridgeChecklist').textContent =
+                        'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' + (s.sonarrOk ? '✓' : '✗') +
+                        '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗');
+                    document.querySelector('#AniBridgeModeBanner').textContent = s.dryRun
+                        ? 'DRY RUN is ON — nothing will be added.'
+                        : 'LIVE mode — sync adds to Sonarr/Radarr.';
+                    if (s.hint) {
+                        document.querySelector('#AniBridgeChecklist').textContent += ' — ' + s.hint;
+                    }
+                }, function () {
+                    document.querySelector('#AniBridgeChecklist').textContent = 'Could not load status.';
+                });
+        }
+
+        function aniBridgeOutcomeName(o) {
+            return { 0: 'Added', 1: 'Already exists', 2: 'Skipped', 3: 'Failed', 4: 'Would add' }[o] || ('#' + o);
+        }
+
+        function aniBridgePassesFilter(item) {
+            var q = (document.querySelector('#AniBridgeSearch').value || '').toLowerCase();
+            var f = document.querySelector('#AniBridgeOutcomeFilter').value;
+            if (f !== '' && String(item.outcome) !== f) { return false; }
+            if (q && (item.title || '').toLowerCase().indexOf(q) < 0) { return false; }
+            return true;
+        }
+
+        function aniBridgeFillList(id, items, limit) {
+            var ul = document.querySelector('#' + id);
+            ul.innerHTML = '';
+            var shown = items.slice(0, limit);
+            shown.forEach(function (item) {
+                var li = document.createElement('li');
+                                li.style.marginBottom = '0.3em';
+                var title = document.createElement('strong');
+                title.textContent = item.title + ' [' + aniBridgeOutcomeName(item.outcome) + ']';
+                li.appendChild(title);
+                var meta = [];
+                if (item.detail) { meta.push(item.detail); }
+                if (item.hint) { meta.push('💡 ' + item.hint); }
+                if (meta.length) {
+                    var d = document.createElement('div');
+                    d.textContent = meta.join(' — ');
+                    d.style.opacity = '0.85';
+                    li.appendChild(d);
+                }
+                var links = document.createElement('div');
+                if (item.sourceUrl) {
+                    var a1 = document.createElement('a');
+                    a1.href = item.sourceUrl; a1.target = '_blank'; a1.rel = 'noopener';
+                    a1.textContent = 'Shinden';
+                    links.appendChild(a1);
+                    links.appendChild(document.createTextNode(' · '));
+                }
+                if (item.aniListUrl) {
+                    var a2 = document.createElement('a');
+                    a2.href = item.aniListUrl; a2.target = '_blank'; a2.rel = 'noopener';
+                    a2.textContent = 'AniList';
+                    links.appendChild(a2);
+                    links.appendChild(document.createTextNode(' · '));
+                }
+                var copy = document.createElement('a');
+                copy.href = '#'; copy.textContent = 'Copy title';
+                copy.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (navigator.clipboard) { navigator.clipboard.writeText(item.title); }
+                });
+                links.appendChild(copy);
+                li.appendChild(links);
+                ul.appendChild(li);
+            });
+            if (items.length > shown.length) {
+                var more = document.createElement('li');
+                more.textContent = '…and ' + (items.length - shown.length) + ' more (use search to narrow down)';
+                ul.appendChild(more);
+            }
+            if (items.length === 0) {
+                var none = document.createElement('li');
+                none.textContent = '—';
+                ul.appendChild(none);
+            }
+        }
+
+        function aniBridgeRenderReport(report) {
+            AniBridgeShinden.report = report;
+            var meta = document.querySelector('#AniBridgeLastSyncMeta');
+            var badges = document.querySelector('#AniBridgeBadges');
+            badges.innerHTML = '';
+            if (!report) {
+                meta.textContent = 'No sync has run yet.';
+                aniBridgeFillList('AniBridgeAddedList', [], 300);
+                aniBridgeFillList('AniBridgeSkippedList', [], 300);
+                return;
+            }
+            var r = report.result || {};
+            var items = r.items || [];
+            meta.textContent = 'Finished ' + aniBridgeTimeAgo(report.finishedAt) +
+                ' (' + new Date(report.finishedAt).toLocaleString() + ')' +
+                (report.dryRun ? ' (dry run)' : ' (live)');
+            if (report.error) {
+                meta.textContent += ' — FAILED: ' + report.error;
+                var hint = document.querySelector('#AniBridgeFatalHint');
+                hint.textContent = 'Check Shinden login / list visibility, then run sync again. See logs for details.';
+            } else {
+                document.querySelector('#AniBridgeFatalHint').textContent = '';
+            }
+            var defs = [
+                ['Scanned', r.scanned || 0, '#7f8c8d'],
+                ['Added', r.added || 0, '#27ae60'],
+                ['AlreadyExists', r.alreadyExists || 0, '#2980b9'],
+                ['WouldAdd', r.wouldAdd || 0, '#16a085'],
+                ['Skipped', r.skipped || 0, '#f39c12'],
+                ['Failed', r.failed || 0, '#e74c3c']
+            ];
+            defs.forEach(function (d) {
+                var s = document.createElement('span');
+                s.textContent = d[0] + ': ' + d[1];
+                s.style.cssText = 'background:' + d[2] + ';color:#fff;border-radius:1em;padding:0.15em 0.7em;font-size:0.9em;';
+                badges.appendChild(s);
+            });
+            var good = items.filter(function (i) { return i.outcome === 0 || i.outcome === 1 || i.outcome === 4; })
+                .filter(aniBridgePassesFilter);
+            var bad = items.filter(function (i) { return i.outcome === 2 || i.outcome === 3; })
+                .filter(aniBridgePassesFilter);
+            document.querySelector('#AniBridgeGoodCount').textContent = '(' + good.length + ')';
+            document.querySelector('#AniBridgeBadCount').textContent = '(' + bad.length + ')';
+            aniBridgeFillList('AniBridgeAddedList', good, 300);
+            aniBridgeFillList('AniBridgeSkippedList', bad, 300);
+        }
+
+        function aniBridgeLoadReport() {
+            var meta = document.querySelector('#AniBridgeLastSyncMeta');
+            meta.textContent = 'Loading…';
+            ApiClient.ajax({
+                type: 'GET',
+                url: ApiClient.getUrl('AniBridge/last-sync'),
+                dataType: 'json'
+            }).then(aniBridgeRenderReport, function () {
+                aniBridgeRenderReport(null);
+            });
+        }
+
+        function aniBridgeLoadHistory(selected) {
+            var sel = document.querySelector('#AniBridgeHistorySelect');
+            ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/history'), dataType: 'json' })
+                .then(function (history) {
+                    sel.innerHTML = '';
+                    (history || []).forEach(function (h, idx) {
+                        var o = document.createElement('option');
+                        o.value = String(idx);
+                        var when = h.finishedAt ? new Date(h.finishedAt).toLocaleString() : 'unknown';
+                        o.textContent = (idx === 0 ? 'Latest — ' : '') + when + (h.dryRun ? ' (dry run)' : '') +
+                            (h.error ? ' FAILED' : '');
+                        sel.appendChild(o);
+                    });
+                    if (!history || history.length === 0) {
+                        var o = document.createElement('option');
+                        o.textContent = 'No history yet';
+                        sel.appendChild(o);
+                        return;
+                    }
+                    sel._history = history;
+                    if (selected !== undefined) { sel.value = String(selected); }
+                }, function () { });
+            sel.onchange = function () {
+                var h = sel._history && sel._history[parseInt(sel.value, 10)];
+                if (h) { aniBridgeRenderReport(h); }
+            };
+        }
+
+        function aniBridgeStopPoll() {
+            if (AniBridgeShinden.pollTimer) {
+                clearInterval(AniBridgeShinden.pollTimer);
+                AniBridgeShinden.pollTimer = null;
+            }
+        }
 
         document.querySelector('#AniBridgeShindenPage').addEventListener('pageshow', function () {
             Dashboard.showLoadingMsg();
@@ -118,13 +343,37 @@
                 document.querySelector('#DryRun').checked = config.DryRun;
                 Dashboard.hideLoadingMsg();
             });
+            aniBridgeLoadStatus();
+            aniBridgeLoadReport();
+            aniBridgeLoadHistory();
         });
+
+        function aniBridgeValidListId(v) {
+            var s = (v || '').trim();
+            if (!s) { return false; }
+            if (/animelist\//i.test(s)) { return true; }
+            return /^\d+(-\S+)?$/.test(s);
+        }
 
         document.querySelector('#AniBridgeShindenForm').addEventListener('submit', function (e) {
             e.preventDefault();
+            var userErr = document.querySelector('#ShindenUsernameError');
+            var idErr = document.querySelector('#ShindenUserIdError');
+            userErr.textContent = '';
+            idErr.textContent = '';
+            var username = document.querySelector('#ShindenUsername').value.trim();
+            var userId = document.querySelector('#ShindenUserId').value.trim();
+            var enabled = document.querySelector('#ShindenEnabled').checked;
+            var bad = false;
+            if (enabled && !username) { userErr.textContent = 'Login is required when sync is enabled.'; bad = true; }
+            if (enabled && !aniBridgeValidListId(userId)) {
+                idErr.textContent = 'Use e.g. 420984-opzo or a full shinden.pl URL.';
+                bad = true;
+            }
+            if (bad) { return false; }
             Dashboard.showLoadingMsg();
             ApiClient.getPluginConfiguration(AniBridgeShinden.pluginId).then(function (config) {
-                config.ShindenEnabled = document.querySelector('#ShindenEnabled').checked;
+                config.ShindenEnabled = enabled;
                 config.ShindenUsername = document.querySelector('#ShindenUsername').value;
                 config.ShindenPassword = document.querySelector('#ShindenPassword').value;
                 config.ShindenUserId = document.querySelector('#ShindenUserId').value;
@@ -136,9 +385,37 @@
                 config.DryRun = document.querySelector('#DryRun').checked;
                 ApiClient.updatePluginConfiguration(AniBridgeShinden.pluginId, config).then(function (result) {
                     Dashboard.processPluginConfigurationUpdateResult(result);
+                    aniBridgeLoadStatus();
                 });
             });
             return false;
+        });
+
+        document.querySelector('#ShindenShowPass').addEventListener('click', function (e) {
+            e.preventDefault();
+            var input = document.querySelector('#ShindenPassword');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        });
+
+        document.querySelector('#AniBridgeTestShinden').addEventListener('click', function () {
+            var out = document.querySelector('#AniBridgeTestResult');
+            out.textContent = 'Testing…';
+            ApiClient.ajax({
+                type: 'POST',
+                url: ApiClient.getUrl('AniBridge/shinden/test'),
+                data: JSON.stringify({
+                    username: document.querySelector('#ShindenUsername').value,
+                    password: document.querySelector('#ShindenPassword').value,
+                    userId: document.querySelector('#ShindenUserId').value
+                }),
+                contentType: 'application/json',
+                dataType: 'json'
+            }).then(function (r) {
+                out.textContent = (r.ok ? '✓ ' : '✗ ') + r.message +
+                    (r.entries !== null && r.entries !== undefined ? ' (' + r.entries + ' entries)' : '');
+            }, function () {
+                out.textContent = 'Test failed to run.';
+            });
         });
 
         document.querySelector('#AniBridgeSyncNow').addEventListener('click', function () {
@@ -150,9 +427,35 @@
                     status.textContent = 'AniBridgeDailySync task not found. Restart the server.';
                     return;
                 }
-                status.textContent = 'Starting sync… follow progress in Dashboard → Scheduled Tasks.';
+                var before = AniBridgeShinden.report && AniBridgeShinden.report.finishedAt;
+                status.textContent = 'Starting sync… progress is also in Dashboard → Scheduled Tasks.';
                 ApiClient.startScheduledTask(task.Id).then(function () {
-                    status.textContent = 'Sync started. See Dashboard → Scheduled Tasks for results.';
+                    status.textContent = 'Sync running… this page refreshes automatically when it finishes.';
+                    aniBridgeStopPoll();
+                    var tries = 0;
+                    AniBridgeShinden.pollTimer = setInterval(function () {
+                        tries++;
+                        ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/last-sync'), dataType: 'json' })
+                            .then(function (report) {
+                                if (report.finishedAt && report.finishedAt !== before) {
+                                    aniBridgeStopPoll();
+                                    status.textContent = 'Sync finished — report updated.';
+                                    aniBridgeRenderReport(report);
+                                    aniBridgeLoadHistory(0);
+                                    aniBridgeLoadStatus();
+                                } else if (tries > 120) {
+                                    aniBridgeStopPoll();
+                                    status.textContent = 'Still running — check Dashboard → Scheduled Tasks.';
+                                } else {
+                                    status.textContent = 'Sync running… (' + tries * 3 + 's)';
+                                }
+                            }, function () {
+                                if (tries > 120) {
+                                    aniBridgeStopPoll();
+                                    status.textContent = 'Still running — check Dashboard → Scheduled Tasks.';
+                                }
+                            });
+                    }, 3000);
                 }, function () {
                     status.textContent = 'Failed to start sync.';
                 });
@@ -161,66 +464,15 @@
             });
         });
 
-        function aniBridgeFillList(id, items, textFn, limit) {
-            var ul = document.querySelector('#' + id);
-            ul.innerHTML = '';
-            var shown = items.slice(0, limit);
-            shown.forEach(function (item) {
-                var li = document.createElement('li');
-                li.textContent = textFn(item);
-                ul.appendChild(li);
-            });
-            if (items.length > shown.length) {
-                var more = document.createElement('li');
-                more.textContent = '…and ' + (items.length - shown.length) + ' more';
-                ul.appendChild(more);
-            }
-            if (items.length === 0) {
-                var none = document.createElement('li');
-                none.textContent = '—';
-                ul.appendChild(none);
-            }
-        }
-
-        function aniBridgeLoadReport() {
-            var meta = document.querySelector('#AniBridgeLastSyncMeta');
-            meta.textContent = 'Loading…';
-            ApiClient.ajax({
-                type: 'GET',
-                url: ApiClient.getUrl('AniBridge/last-sync'),
-                dataType: 'json'
-            }).then(function (report) {
-                var r = report.result || {};
-                var items = r.items || [];
-                var when = report.finishedAt ? new Date(report.finishedAt).toLocaleString() : 'unknown time';
-                meta.textContent = 'Finished: ' + when + (report.dryRun ? ' (dry run)' : '');
-                if (report.error) {
-                    meta.textContent += ' — FAILED: ' + report.error;
-                }
-                var counts = ['Scanned', 'Added', 'AlreadyExists', 'Skipped', 'Failed', 'WouldAdd']
-                    .map(function (k) { return k + ': ' + (r[k.charAt(0).toLowerCase() + k.slice(1)] || 0); });
-                document.querySelector('#AniBridgeLastSyncCounts').textContent = counts.join(' · ');
-                var good = items.filter(function (i) { return i.outcome === 0 || i.outcome === 1 || i.outcome === 4; });
-                var bad = items.filter(function (i) { return i.outcome === 2 || i.outcome === 3; });
-                aniBridgeFillList('AniBridgeAddedList', good, function (i) { return i.title; }, 300);
-                aniBridgeFillList('AniBridgeSkippedList', bad, function (i) {
-                    return i.title + (i.detail ? ' — ' + i.detail : '');
-                }, 300);
-            }, function () {
-                meta.textContent = 'No sync has run yet.';
-                document.querySelector('#AniBridgeLastSyncCounts').textContent = '';
-                aniBridgeFillList('AniBridgeAddedList', [], function (i) { return i.title; }, 300);
-                aniBridgeFillList('AniBridgeSkippedList', [], function (i) { return i.title; }, 300);
-            });
-        }
-
-        document.querySelector('#AniBridgeRefreshReport').addEventListener('click', aniBridgeLoadReport);
-        document.querySelector('#AniBridgeShindenPage').addEventListener('pageshow', aniBridgeLoadReport);
-
-        function aniBridgeNav(page) {
-            if (window.Dashboard && Dashboard.navigate) {
-                Dashboard.navigate('configurationpage?name=' + encodeURIComponent(page));
-            }
-        }
+        document.querySelector('#AniBridgeRefreshReport').addEventListener('click', function () {
+            aniBridgeLoadReport();
+            aniBridgeLoadHistory();
+        });
+        document.querySelector('#AniBridgeSearch').addEventListener('input', function () {
+            if (AniBridgeShinden.report) { aniBridgeRenderReport(AniBridgeShinden.report); }
+        });
+        document.querySelector('#AniBridgeOutcomeFilter').addEventListener('change', function () {
+            if (AniBridgeShinden.report) { aniBridgeRenderReport(AniBridgeShinden.report); }
+        });
     </script>
 </div>

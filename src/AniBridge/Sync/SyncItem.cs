@@ -17,4 +17,11 @@ public enum SyncOutcome
 /// <summary>
 /// Result of a single list entry.
 /// </summary>
-public sealed record SyncItem(string Title, AnimeStatus Status, SyncOutcome Outcome, string? Detail);
+public sealed record SyncItem(
+    string Title,
+    AnimeStatus Status,
+    SyncOutcome Outcome,
+    string? Detail,
+    string? SourceUrl = null,
+    string? AniListUrl = null,
+    string? Hint = null);

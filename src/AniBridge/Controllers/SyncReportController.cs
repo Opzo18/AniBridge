@@ -25,4 +25,10 @@ public sealed class SyncReportController : ControllerBase
         var report = _store.Load();
         return report is null ? NotFound() : report;
     }
+
+    [HttpGet("history")]
+    public ActionResult<IReadOnlyList<SyncReport>> GetHistory()
+    {
+        return Ok(_store.LoadHistory());
+    }
 }

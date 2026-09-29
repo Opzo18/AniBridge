@@ -44,6 +44,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         [
             new PluginPageInfo
             {
+                Name = "AniBridge",
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.overview.html",
+            },
+            new PluginPageInfo
+            {
                 Name = "AniBridge Shinden",
                 EmbeddedResourcePath = GetType().Namespace + ".Configuration.shinden.html",
             },

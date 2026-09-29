@@ -3,10 +3,12 @@
     <div data-role="content">
         <div class="content-primary">
             <div class="fieldDescription">AniBridge:
+                <a href="#" onclick="aniBridgeNav('AniBridge');return false;">Overview</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Shinden');return false;">Shinden</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
             </div>
+            <div class="fieldDescription" id="AniBridgeSonarrChecklist"></div>
             <form id="AniBridgeSonarrForm">
                 <h3 class="sectionTitle">Sonarr (TV shows)</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -17,13 +19,20 @@
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="SonarrUrl">URL (e.g. http://192.168.33.20:8989)</label>
-                    <input id="SonarrUrl" type="text" is="emby-input" />
+                    <input id="SonarrUrl" type="text" is="emby-input" placeholder="http://192.168.33.20:8989" />
+                    <div class="fieldDescription" id="SonarrUrlError" style="color:#e74c3c;"></div>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="SonarrApiKey">API key</label>
                     <input id="SonarrApiKey" type="password" is="emby-input" autocomplete="off" />
-                    <div class="fieldDescription">Save first, then reopen this page to load the lists below from Sonarr.</div>
+                    <div class="fieldDescription">Settings → General → Security in Sonarr. <a href="#" id="SonarrShowKey">Show</a></div>
                 </div>
+                <div>
+                    <button id="SonarrTestBtn" is="emby-button" type="button" class="raised block emby-button">
+                        <span>Test &amp; reload lists</span>
+                    </button>
+                </div>
+                <div class="fieldDescription" id="AniBridgeSonarrTest"></div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="SonarrQualityProfileId">Quality profile</label>
                     <select is="emby-select" id="SonarrQualityProfileId" class="emby-select"></select>
@@ -45,12 +54,21 @@
     <script type="text/javascript">
         var AniBridgeSonarr = { pluginId: 'befab610-6eca-4d99-8e12-cdb4e26114aa' };
 
+        function aniBridgeNav(page) {
+            if (window.Dashboard && Dashboard.navigate) {
+                Dashboard.navigate('configurationpage?name=' + encodeURIComponent(page));
+            }
+        }
+
         function aniBridgeFillSelect(id, items, current) {
             var sel = document.querySelector('#' + id);
             sel.innerHTML = '';
             var values = items.slice();
             if (current && !values.some(function (v) { return v.value === current; })) {
                 values.unshift({ value: current, text: current + ' (saved)' });
+            }
+            if (values.length === 0) {
+                values.unshift({ value: '', text: '— Test the connection first —' });
             }
             values.forEach(function (v) {
                 var o = document.createElement('option');
@@ -61,17 +79,51 @@
             if (current) { sel.value = current; }
         }
 
+        function aniBridgeIsHttpUrl(s) {
+            return /^https?:\/\/.+/.test((s || '').trim());
+        }
+
+        function aniBridgeSonarrLoadOptions(url, key, savedProfile, savedFolder, testMsgEl) {
+            var warn = document.querySelector('#AniBridgeSonarrWarn');
+            return ApiClient.ajax({
+                type: 'POST',
+                url: ApiClient.getUrl('AniBridge/sonarr/test'),
+                data: JSON.stringify({ url: url, apiKey: key }),
+                contentType: 'application/json',
+                dataType: 'json'
+            }).then(function (data) {
+                aniBridgeFillSelect('SonarrQualityProfileId',
+                    (data.qualityProfiles || []).map(function (p) { return { value: String(p.id), text: p.name }; }),
+                    savedProfile);
+                aniBridgeFillSelect('SonarrRootFolder',
+                    (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
+                    savedFolder);
+                warn.textContent = data.error || '';
+                if (testMsgEl) { testMsgEl.textContent = data.error ? ('Test: ' + data.error) : 'Test OK — lists loaded.'; }
+            }, function () {
+                warn.textContent = 'Could not reach AniBridge test endpoint.';
+                if (testMsgEl) { testMsgEl.textContent = 'Test failed to run.'; }
+            });
+        }
+
         document.querySelector('#AniBridgeSonarrPage').addEventListener('pageshow', function () {
             Dashboard.showLoadingMsg();
             ApiClient.getPluginConfiguration(AniBridgeSonarr.pluginId).then(function (config) {
                 document.querySelector('#SonarrEnabled').checked = config.SonarrEnabled;
                 document.querySelector('#SonarrUrl').value = config.SonarrUrl || '';
                 document.querySelector('#SonarrApiKey').value = config.SonarrApiKey || '';
-                var warn = document.querySelector('#AniBridgeSonarrWarn');
                 var savedProfile = String(config.SonarrQualityProfileId || 1);
                 var savedFolder = config.SonarrRootFolder || '';
                 aniBridgeFillSelect('SonarrQualityProfileId', [], savedProfile);
                 aniBridgeFillSelect('SonarrRootFolder', [], savedFolder);
+                ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
+                    .then(function (s) {
+                        var el = document.querySelector('#AniBridgeSonarrChecklist');
+                        el.textContent = 'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' +
+                            (s.sonarrOk ? '✓' : '✗') + '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗') +
+                            (s.dryRun ? '  ·  DRY RUN' : '  ·  LIVE');
+                    }, function () { });
+                // Load lists from saved settings (no test message on open).
                 ApiClient.ajax({
                     type: 'GET',
                     url: ApiClient.getUrl('AniBridge/sonarr/options'),
@@ -83,22 +135,51 @@
                     aniBridgeFillSelect('SonarrRootFolder',
                         (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
                         savedFolder);
-                    warn.textContent = data.error || '';
+                    document.querySelector('#AniBridgeSonarrWarn').textContent = data.error || '';
                     Dashboard.hideLoadingMsg();
                 }, function () {
-                    warn.textContent = 'Could not load lists from Sonarr. Check URL/key, saved values kept.';
+                    document.querySelector('#AniBridgeSonarrWarn').textContent =
+                        'Could not load lists from Sonarr. Check URL/key, saved values kept.';
                     Dashboard.hideLoadingMsg();
                 });
             });
         });
 
+        document.querySelector('#SonarrTestBtn').addEventListener('click', function () {
+            var url = document.querySelector('#SonarrUrl').value;
+            var key = document.querySelector('#SonarrApiKey').value;
+            var urlErr = document.querySelector('#SonarrUrlError');
+            urlErr.textContent = aniBridgeIsHttpUrl(url) ? '' : 'URL should look like http://192.168.33.20:8989';
+            if (!aniBridgeIsHttpUrl(url) || !key.trim()) {
+                document.querySelector('#AniBridgeSonarrTest').textContent = 'Enter URL and API key first.';
+                return;
+            }
+            var msg = document.querySelector('#AniBridgeSonarrTest');
+            msg.textContent = 'Testing…';
+            aniBridgeSonarrLoadOptions(url.trim(), key.trim(),
+                document.querySelector('#SonarrQualityProfileId').value,
+                document.querySelector('#SonarrRootFolder').value, msg);
+        });
+
+        document.querySelector('#SonarrShowKey').addEventListener('click', function (e) {
+            e.preventDefault();
+            var input = document.querySelector('#SonarrApiKey');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        });
+
         document.querySelector('#AniBridgeSonarrForm').addEventListener('submit', function (e) {
             e.preventDefault();
+            var url = document.querySelector('#SonarrUrl').value;
+            if (document.querySelector('#SonarrEnabled').checked && !aniBridgeIsHttpUrl(url)) {
+                document.querySelector('#SonarrUrlError').textContent =
+                    'URL should look like http://192.168.33.20:8989';
+                return false;
+            }
             Dashboard.showLoadingMsg();
             ApiClient.getPluginConfiguration(AniBridgeSonarr.pluginId).then(function (config) {
                 config.SonarrEnabled = document.querySelector('#SonarrEnabled').checked;
-                config.SonarrUrl = document.querySelector('#SonarrUrl').value;
-                config.SonarrApiKey = document.querySelector('#SonarrApiKey').value;
+                config.SonarrUrl = document.querySelector('#SonarrUrl').value.trim();
+                config.SonarrApiKey = document.querySelector('#SonarrApiKey').value.trim();
                 config.SonarrQualityProfileId = parseInt(document.querySelector('#SonarrQualityProfileId').value, 10) || 1;
                 config.SonarrRootFolder = document.querySelector('#SonarrRootFolder').value;
                 ApiClient.updatePluginConfiguration(AniBridgeSonarr.pluginId, config).then(function (result) {
@@ -107,11 +188,5 @@
             });
             return false;
         });
-
-        function aniBridgeNav(page) {
-            if (window.Dashboard && Dashboard.navigate) {
-                Dashboard.navigate('configurationpage?name=' + encodeURIComponent(page));
-            }
-        }
     </script>
 </div>
