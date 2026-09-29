@@ -9,9 +9,9 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-Version **0.3.1** live: fixed settings-page parsing, live sync progress
-with interim results, empty-state guards. ✅
-(`dotnet test`: 94/94 passed)
+Version **0.3.2** live: fixed settings-page parsing, live sync progress
+with interim results, scope filter (only enabled statuses sync), empty-state guards. ✅
+(`dotnet test`: 95/95 passed)
 
 ## Requirements
 

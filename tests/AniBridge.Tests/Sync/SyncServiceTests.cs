@@ -140,7 +140,7 @@ public class SyncServiceTests
     }
 
     [Fact]
-    public async Task RunAsync_DroppedStatus_SkippedByDefault()
+    public async Task RunAsync_DroppedStatus_FilteredOutByDefault()
     {
         var provider = new FakeProvider(Item("Dropped Show", AnimeStatus.Dropped));
         var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>());
@@ -151,8 +151,9 @@ public class SyncServiceTests
 
         var result = await service.RunAsync();
 
-        var item = Assert.Single(result.Items);
-        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        // Disabled statuses never reach metadata/*Arr and are not counted at all.
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.Scanned);
     }
 
     [Fact]

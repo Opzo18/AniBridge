@@ -57,17 +57,28 @@ public sealed class SyncService
         var config = _config();
         var items = await _provider.GetListAsync(cancellationToken).ConfigureAwait(false);
 
-        var results = new List<SyncItem>(items.Count);
-        for (var i = 0; i < items.Count; i++)
+        // Statuses disabled in settings never reach metadata/*Arr: they are not
+        // counted, paced, or reported per-title. The scope label lands in the report.
+        var scope = ScopeLabel(config);
+        var scoped = FilterByEnabledStatuses(items, config, out var ignored);
+        if (ignored > 0)
         {
-            results.Add(await ProcessAsync(items[i], config, cancellationToken).ConfigureAwait(false));
-            progress?.Report((double)(i + 1) / items.Count);
-            if ((i + 1) % ProgressEvery == 0 || i + 1 == items.Count)
+            _logger.LogInformation(
+                "AniBridge: ignoring {Ignored} entries with disabled statuses (scope: {Scope}).",
+                ignored, scope ?? "all");
+        }
+
+        var results = new List<SyncItem>(scoped.Count);
+        for (var i = 0; i < scoped.Count; i++)
+        {
+            results.Add(await ProcessAsync(scoped[i], config, cancellationToken).ConfigureAwait(false));
+            progress?.Report(scoped.Count == 0 ? 1 : (double)(i + 1) / scoped.Count);
+            if ((i + 1) % ProgressEvery == 0 || i + 1 == scoped.Count)
             {
-                SaveProgress(config, results);
+                SaveProgress(config, scope, results);
             }
 
-            if (i + 1 < items.Count)
+            if (i + 1 < scoped.Count)
             {
                 await Task.Delay(_pacing, cancellationToken).ConfigureAwait(false);
             }
@@ -75,11 +86,11 @@ public sealed class SyncService
 
         var result = new SyncResult { Items = results };
         _logger.LogInformation("AniBridge: sync finished: {Result}", result);
-        SaveReport(config, result);
+        SaveReport(config, scope, result);
         return result;
     }
 
-    private void SaveReport(PluginConfiguration? config, SyncResult result)
+    private void SaveReport(PluginConfiguration? config, string? scope, SyncResult result)
     {
         if (_reportStore is null)
         {
@@ -92,6 +103,7 @@ public sealed class SyncService
             {
                 FinishedAt = DateTimeOffset.UtcNow,
                 DryRun = config?.DryRun ?? false,
+                Scope = scope,
                 Result = result,
             });
         }
@@ -101,7 +113,7 @@ public sealed class SyncService
         }
     }
 
-    private void SaveProgress(PluginConfiguration? config, List<SyncItem> partial)
+    private void SaveProgress(PluginConfiguration? config, string? scope, List<SyncItem> partial)
     {
         if (_reportStore is null)
         {
@@ -115,6 +127,7 @@ public sealed class SyncService
                 FinishedAt = DateTimeOffset.UtcNow,
                 DryRun = config?.DryRun ?? false,
                 InProgress = true,
+                Scope = scope,
                 Result = new SyncResult { Items = partial.ToArray() },
             });
         }
@@ -188,6 +201,47 @@ public sealed class SyncService
         MediaType.Movie when config.RadarrEnabled => _radarr.Value,
         _ => null,
     };
+
+    private static List<AnimeListItem> FilterByEnabledStatuses(
+        IReadOnlyList<AnimeListItem> items, PluginConfiguration? config, out int ignored)
+    {
+        ignored = 0;
+        if (config is null)
+        {
+            return items.ToList();
+        }
+
+        var kept = new List<AnimeListItem>(items.Count);
+        foreach (var item in items)
+        {
+            if (IsStatusEnabled(config, item.Status))
+            {
+                kept.Add(item);
+            }
+            else
+            {
+                ignored++;
+            }
+        }
+
+        return kept;
+    }
+
+    private static string? ScopeLabel(PluginConfiguration? config)
+    {
+        if (config is null)
+        {
+            return null;
+        }
+
+        var enabled = new List<string>(5);
+        if (config.SyncWatching) { enabled.Add("Watching"); }
+        if (config.SyncPlanned) { enabled.Add("Planned"); }
+        if (config.SyncCompleted) { enabled.Add("Completed"); }
+        if (config.SyncOnHold) { enabled.Add("On hold"); }
+        if (config.SyncDropped) { enabled.Add("Dropped"); }
+        return enabled.Count == 0 ? "none" : string.Join(", ", enabled);
+    }
 
     private static bool IsStatusEnabled(PluginConfiguration config, AnimeStatus status) => status switch
     {

@@ -22,5 +22,11 @@ public sealed class SyncReport
     /// </summary>
     public bool InProgress { get; init; }
 
+    /// <summary>
+    /// Human-readable sync scope, e.g. "Watching, Planned".
+    /// Null for reports written by older versions.
+    /// </summary>
+    public string? Scope { get; init; }
+
     public SyncResult Result { get; init; } = new();
 }

@@ -77,9 +77,11 @@
                         var dryRun = !!abPick(report, 'dryRun', 'DryRun');
                         var error = abPick(report, 'error', 'Error');
                         var inProgress = !!abPick(report, 'inProgress', 'InProgress');
+                        var scope = abPick(report, 'scope', 'Scope');
                         var parts = ['Scanned', 'Added', 'AlreadyExists', 'Skipped', 'Failed', 'WouldAdd']
                             .map(function (k) { return k + ': ' + c(k.charAt(0).toLowerCase() + k.slice(1), k); });
                         last.textContent = (dryRun ? '(dry run) ' : '') + (inProgress ? 'Running… ' : 'Finished ') + when + ' — ' + parts.join(' · ') +
+                            (scope ? ' — scope: ' + scope : '') +
                             (error ? ' — FAILED: ' + error : '');
                     }, function () {
                         last.textContent = 'No sync has run yet.';

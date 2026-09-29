@@ -110,6 +110,7 @@
                         <option value="4">Would add</option>
                         <option value="2">Skipped</option>
                         <option value="3">Failed</option>
+                        <option value="-1">Unknown</option>
                     </select>
                 </div>
                 <div class="fieldDescription" id="AniBridgeLastSyncMeta">No sync has run yet.</div>
@@ -147,14 +148,39 @@
         }
 
         function abNormItem(i) {
+            var rawOutcome = abPick(i, 'outcome', 'Outcome');
+            var rawStatus = abPick(i, 'status', 'Status');
             return {
                 title: abPick(i, 'title', 'Title') || '',
-                outcome: Number(abPick(i, 'outcome', 'Outcome')),
+                outcome: abNormOutcome(rawOutcome),
+                outcomeRaw: (typeof rawOutcome === 'string') ? rawOutcome : null,
+                status: abNormStatusName(rawStatus),
                 detail: abPick(i, 'detail', 'Detail'),
                 sourceUrl: abPick(i, 'sourceUrl', 'SourceUrl'),
                 aniListUrl: abPick(i, 'aniListUrl', 'AniListUrl'),
                 hint: abPick(i, 'hint', 'Hint')
             };
+        }
+
+        // Server (Jellyfin JSON) sends enums as strings ("Skipped"); accept numbers too.
+        var abOutcomeMap = { added: 0, alreadyexists: 1, skipped: 2, failed: 3, wouldadd: 4 };
+
+        function abNormOutcome(v) {
+            if (typeof v === 'number' && isFinite(v)) { return v; }
+            if (typeof v === 'string') {
+                var t = v.trim().toLowerCase();
+                if (/^-?\d+$/.test(t)) { return parseInt(t, 10); }
+                if (t in abOutcomeMap) { return abOutcomeMap[t]; }
+            }
+            return -1;
+        }
+
+        var abStatusNames = ['Planned', 'Watching', 'Completed', 'Dropped', 'On hold'];
+
+        function abNormStatusName(v) {
+            if (typeof v === 'string' && v) { return v; }
+            if (typeof v === 'number' && abStatusNames[v] !== undefined) { return abStatusNames[v]; }
+            return null;
         }
 
         function abNormReport(r) {
@@ -167,9 +193,11 @@
                 dryRun: !!abPick(r, 'dryRun', 'DryRun'),
                 error: abPick(r, 'error', 'Error'),
                 inProgress: !!abPick(r, 'inProgress', 'InProgress'),
+                scope: abPick(r, 'scope', 'Scope'),
                 result: {
                     scanned: items.length,
                     added: n(0), alreadyExists: n(1), skipped: n(2), failed: n(3), wouldAdd: n(4),
+                    unknown: n(-1),
                     items: items
                 }
             };
@@ -222,8 +250,16 @@
                 });
         }
 
-        function aniBridgeOutcomeName(o) {
-            return { 0: 'Added', 1: 'Already exists', 2: 'Skipped', 3: 'Failed', 4: 'Would add' }[o] || ('#' + o);
+        function aniBridgeOutcomeName(item) {
+            var names = { 0: 'Added', 1: 'Already exists', 2: 'Skipped', 3: 'Failed', 4: 'Would add' };
+            if (names[item.outcome] !== undefined) { return names[item.outcome]; }
+            return item.outcomeRaw || ('#' + item.outcome);
+        }
+
+        function aniBridgeFilterActive() {
+            var q = (document.querySelector('#AniBridgeSearch').value || '').trim();
+            var f = document.querySelector('#AniBridgeOutcomeFilter').value;
+            return q !== '' || f !== '';
         }
 
         function aniBridgePassesFilter(item) {
@@ -234,7 +270,7 @@
             return true;
         }
 
-        function aniBridgeFillList(id, items, limit) {
+        function aniBridgeFillList(id, items, limit, emptyText) {
             var ul = document.querySelector('#' + id);
             ul.innerHTML = '';
             var shown = items.slice(0, limit);
@@ -242,7 +278,8 @@
                 var li = document.createElement('li');
                                 li.style.marginBottom = '0.3em';
                 var title = document.createElement('strong');
-                title.textContent = item.title + ' [' + aniBridgeOutcomeName(item.outcome) + ']';
+                title.textContent = item.title + (item.status ? ' (' + item.status + ')' : '') +
+                    ' [' + aniBridgeOutcomeName(item) + ']';
                 li.appendChild(title);
                 var meta = [];
                 if (item.detail) { meta.push(item.detail); }
@@ -285,7 +322,7 @@
             }
             if (items.length === 0) {
                 var none = document.createElement('li');
-                none.textContent = '—';
+                none.textContent = emptyText || '—';
                 ul.appendChild(none);
             }
         }
@@ -307,7 +344,8 @@
             meta.textContent = (report.inProgress ? 'Running… updated ' : 'Finished ') +
                 aniBridgeTimeAgo(report.finishedAt) +
                 ' (' + new Date(report.finishedAt).toLocaleString() + ')' +
-                (report.dryRun ? ' (dry run)' : ' (live)');
+                (report.dryRun ? ' (dry run)' : ' (live)') +
+                (report.scope ? ' — scope: ' + report.scope : '');
             if (report.error) {
                 meta.textContent += ' — FAILED: ' + report.error;
                 var hint = document.querySelector('#AniBridgeFatalHint');
@@ -323,20 +361,25 @@
                 ['Skipped', r.skipped || 0, '#f39c12'],
                 ['Failed', r.failed || 0, '#e74c3c']
             ];
+            if (r.unknown) { defs.push(['Unknown', r.unknown, '#95a5a6']); }
             defs.forEach(function (d) {
                 var s = document.createElement('span');
                 s.textContent = d[0] + ': ' + d[1];
                 s.style.cssText = 'background:' + d[2] + ';color:#fff;border-radius:1em;padding:0.15em 0.7em;font-size:0.9em;';
                 badges.appendChild(s);
             });
-            var good = items.filter(function (i) { return i.outcome === 0 || i.outcome === 1 || i.outcome === 4; })
-                .filter(aniBridgePassesFilter);
-            var bad = items.filter(function (i) { return i.outcome === 2 || i.outcome === 3; })
-                .filter(aniBridgePassesFilter);
+            var goodAll = items.filter(function (i) { return i.outcome === 0 || i.outcome === 1 || i.outcome === 4; });
+            var badAll = items.filter(function (i) { return i.outcome === 2 || i.outcome === 3 || i.outcome === -1; });
+            var good = goodAll.filter(aniBridgePassesFilter);
+            var bad = badAll.filter(aniBridgePassesFilter);
             document.querySelector('#AniBridgeGoodCount').textContent = '(' + good.length + ')';
             document.querySelector('#AniBridgeBadCount').textContent = '(' + bad.length + ')';
-            aniBridgeFillList('AniBridgeAddedList', good, 300);
-            aniBridgeFillList('AniBridgeSkippedList', bad, 300);
+            var emptyFiltered = 'No matches — clear search or outcome filter.';
+            var emptyNone = report.inProgress ? 'Nothing in this group yet — sync is still running…' : '—';
+            aniBridgeFillList('AniBridgeAddedList', good, 300,
+                goodAll.length ? emptyFiltered : emptyNone);
+            aniBridgeFillList('AniBridgeSkippedList', bad, 300,
+                badAll.length ? emptyFiltered : emptyNone);
         }
 
         function aniBridgeLoadReport() {

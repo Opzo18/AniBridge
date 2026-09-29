@@ -128,6 +128,36 @@ public class UxImprovementsTests
     }
 
     [Fact]
+    public async Task SyncService_FiltersDisabledStatusesBeforeProcessing()
+    {
+        var metadata = new CountingMetadata();
+        var finals = new List<SyncReport>();
+        var service = new SyncService(
+            new FixedListProvider(
+            [
+                new AnimeListItem("S", "1", "W", "http://x/1", AnimeStatus.Watching, 0, null),
+                new AnimeListItem("S", "2", "D", "http://x/2", AnimeStatus.Dropped, 0, null),
+                new AnimeListItem("S", "3", "C", "http://x/3", AnimeStatus.Completed, 0, null),
+            ]),
+            metadata,
+            new Lazy<SonarrClient>(() => throw new InvalidOperationException("must not be used")),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")),
+            NullLogger<SyncService>.Instance,
+            () => new Configuration.PluginConfiguration { DryRun = true },
+            TimeSpan.Zero,
+            new ProgressCapturingStore(new List<SyncReport>(), finals));
+
+        var result = await service.RunAsync();
+
+        // Dropped is off by default: never resolved, never counted, never reported.
+        Assert.Equal(2, metadata.Calls);
+        Assert.Equal(2, result.Scanned);
+        Assert.DoesNotContain(result.Items, i => i.Title == "D");
+        var final = Assert.Single(finals);
+        Assert.Equal("Watching, Planned, Completed, On hold", final.Scope);
+    }
+
+    [Fact]
     public async Task SyncService_WritesProgressSnapshotsDuringRun()
     {
         var progress = new List<SyncReport>();
@@ -181,5 +211,26 @@ public class UxImprovementsTests
 
         public Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default) =>
             Task.FromResult<ResolvedMedia?>(null);
+    }
+
+    private sealed class FixedListProvider(IReadOnlyList<AnimeListItem> items) : IAnimeProvider
+    {
+        public string Name => "Fixed";
+
+        public Task<IReadOnlyList<AnimeListItem>> GetListAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(items);
+    }
+
+    private sealed class CountingMetadata : IMetadataProvider
+    {
+        public string Name => "Counting";
+
+        public int Calls { get; private set; }
+
+        public Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult<ResolvedMedia?>(null);
+        }
     }
 }
