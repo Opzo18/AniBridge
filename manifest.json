@@ -8,6 +8,14 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.4.2.0",
+        "changelog": "Miss diagnostics (closest/tried in skipped details), spacing-proof fallback matching, Shinden aliases debug endpoint, chip headers.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.2/anibridge_0.4.2.zip",
+        "checksum": "b42eb237a2b9c35945d2ed0d7821eb80",
+        "timestamp": "2026-09-29 10:35:21"
+      },
+      {
         "version": "0.4.1.0",
         "changelog": "Smarter AniList matching: synonyms plus retry queries from Shinden alternate titles (exact matches only).",
         "targetAbi": "12.1.0.0",

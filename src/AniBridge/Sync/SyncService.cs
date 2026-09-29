@@ -154,8 +154,11 @@ public sealed class SyncService
             if (media is null)
             {
                 const string detail = "unrecognized title";
+                var miss = _metadata.DescribeLastMiss();
                 return new SyncItem(
-                    item.Title, item.Status, SyncOutcome.Skipped, detail, item.Url, null,
+                    item.Title, item.Status, SyncOutcome.Skipped,
+                    miss is null ? detail : $"{detail} ({miss})",
+                    item.Url, null,
                     ErrorHints.ForDetail(SyncOutcome.Skipped, detail));
             }
 

@@ -233,4 +233,35 @@ public class UxImprovementsTests
             return Task.FromResult<ResolvedMedia?>(null);
         }
     }
+
+    [Fact]
+    public async Task SyncService_MissDiagnostics_AppendedToDetail()
+    {
+        var service = new SyncService(
+            new ManyProvider(1),
+            new MissMetadata(),
+            new Lazy<SonarrClient>(() => throw new InvalidOperationException("must not be used")),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")),
+            NullLogger<SyncService>.Instance,
+            () => new Configuration.PluginConfiguration { DryRun = true },
+            TimeSpan.Zero,
+            new ProgressCapturingStore(new List<SyncReport>(), new List<SyncReport>()));
+
+        var result = await service.RunAsync();
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        Assert.StartsWith("unrecognized title", item.Detail, StringComparison.Ordinal);
+        Assert.Contains("closest:", item.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class MissMetadata : IMetadataProvider
+    {
+        public string Name => "Miss";
+
+        public Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ResolvedMedia?>(null);
+
+        public string? DescribeLastMiss() => "closest: 'Some Other Show'";
+    }
 }

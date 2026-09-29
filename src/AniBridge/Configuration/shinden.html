@@ -8,8 +8,7 @@
                 <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
             </div>
-            <div class="fieldDescription" id="AniBridgeChecklist">Loading status…</div>
-            <div class="fieldDescription" id="AniBridgeModeBanner" style="font-weight:bold;"></div>
+            <div id="AniBridgeShindenChips" style="display:flex;gap:0.4em;flex-wrap:wrap;margin-bottom:0.5em;"></div>
             <form id="AniBridgeShindenForm">
                 <h3 class="sectionTitle">Shinden.pl</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -236,17 +235,28 @@
             ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                 .then(function (s) {
                     s = abNormStatus(s);
-                    document.querySelector('#AniBridgeChecklist').textContent =
-                        'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' + (s.sonarrOk ? '✓' : '✗') +
-                        '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗');
-                    document.querySelector('#AniBridgeModeBanner').textContent = s.dryRun
-                        ? 'DRY RUN is ON — nothing will be added.'
-                        : 'LIVE mode — sync adds to Sonarr/Radarr.';
+                    var box = document.querySelector('#AniBridgeShindenChips');
+                    box.innerHTML = '';
+                    [['Shinden', s.shindenOk], ['Sonarr', s.sonarrOk], ['Radarr', s.radarrOk]].forEach(function (c) {
+                        var chip = document.createElement('span');
+                        chip.textContent = c[0] + ' ' + (c[1] ? '✓' : '✗');
+                        chip.style.cssText = 'background:' + (c[1] ? '#27ae60' : '#e74c3c') + ';color:#fff;' +
+                            'border-radius:0.8em;padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
+                        box.appendChild(chip);
+                    });
+                    var mode = document.createElement('span');
+                    mode.textContent = s.dryRun ? 'DRY RUN' : 'LIVE';
+                    mode.style.cssText = 'background:' + (s.dryRun ? '#f39c12' : '#27ae60') + ';color:#fff;' +
+                        'border-radius:0.8em;padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
+                    box.appendChild(mode);
                     if (s.hint) {
-                        document.querySelector('#AniBridgeChecklist').textContent += ' — ' + s.hint;
+                        var hint = document.createElement('span');
+                        hint.className = 'fieldDescription';
+                        hint.textContent = s.hint;
+                        box.appendChild(hint);
                     }
                 }, function () {
-                    document.querySelector('#AniBridgeChecklist').textContent = 'Could not load status.';
+                    document.querySelector('#AniBridgeShindenChips').textContent = 'Could not load status.';
                 });
         }
 

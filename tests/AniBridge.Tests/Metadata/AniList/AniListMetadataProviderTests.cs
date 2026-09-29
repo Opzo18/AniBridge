@@ -170,6 +170,76 @@ public class AniListMetadataProviderTests
     }
 
     [Fact]
+    public async Task ResolveAsync_CompactSpacingVariant_MatchesUniquely()
+    {
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":184356,"title":{"romaji":"Dogul Wang","english":"Tomb Raider King","native":"도굴왕"},"synonyms":["Toukutsuou","盗掘王"],"format":"TV","episodes":12,"startDate":{"year":2026}}
+            ]}}}
+            """;
+
+        var media = await CreateProvider(Json).ResolveAsync(Item("Toukutsu Ou"));
+
+        Assert.NotNull(media);
+        Assert.Equal(184356, media.AniListId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CompactAmbiguous_ReturnsNull()
+    {
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":1,"title":{"romaji":"My-Hero","english":null,"native":null},"format":"TV","episodes":12,"startDate":{"year":2020}},
+              {"id":2,"title":{"romaji":"My Hero","english":null,"native":null},"format":"TV","episodes":12,"startDate":{"year":2021}}
+            ]}}}
+            """;
+
+        Assert.Null(await CreateProvider(Json).ResolveAsync(Item("MyHero")));
+    }
+
+    [Theory]
+    [InlineData("toukutsu ou", "toukutsuou")]
+    [InlineData("kimi no na wa.", "kiminonawa")]
+    public void Compact_StripsNonAlphanumeric(string input, string expected)
+    {
+        Assert.Equal(expected, AniListMetadataProvider.Compact(input));
+    }
+
+    [Fact]
+    public async Task DescribeLastMiss_AfterMiss_ReportsClosestAndTried()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("""
+            {"data":{"Page":{"media":[
+              {"id":1,"title":{"romaji":"Some Other Show","english":null,"native":null},"format":"TV","episodes":12,"startDate":{"year":2020}}
+            ]}}}
+            """));
+        handler.Enqueue(Json("""{"data":{"Page":{"media":[]}}}"""));
+        var http = new HttpClient(handler) { BaseAddress = new Uri(AniListClient.Endpoint + "/") };
+        var client = new AniListClient(http, NullLogger<AniListClient>.Instance);
+        var provider = new AniListMetadataProvider(
+            client,
+            NullLogger<AniListMetadataProvider>.Instance,
+            (_, _) => Task.FromResult<IReadOnlyList<string>>(["Nope Alias"]));
+
+        Assert.Null(await provider.ResolveAsync(Item("Missing Title")));
+
+        var miss = provider.DescribeLastMiss();
+        Assert.NotNull(miss);
+        Assert.Contains("Some Other Show", miss, StringComparison.Ordinal);
+        Assert.Contains("Nope Alias", miss, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DescribeLastMiss_AfterHit_ReturnsNull()
+    {
+        var provider = CreateProvider(FrierenJson);
+
+        Assert.NotNull(await provider.ResolveAsync(Item("Sousou no Frieren")));
+        Assert.Null(provider.DescribeLastMiss());
+    }
+
+    [Fact]
     public async Task ResolveAsync_InexactOnly_ReturnsNull()
     {
         var media = await CreateProvider(FrierenJson).ResolveAsync(Item("Frieren"));

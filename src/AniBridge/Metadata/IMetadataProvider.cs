@@ -11,4 +11,10 @@ public interface IMetadataProvider
     string Name { get; }
 
     Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Human-readable reason for the last miss (tried queries, closest candidates),
+    /// or null when unknown. Best-effort diagnostics for the settings page.
+    /// </summary>
+    string? DescribeLastMiss() => null;
 }

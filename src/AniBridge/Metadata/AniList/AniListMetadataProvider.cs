@@ -20,6 +20,8 @@ public sealed class AniListMetadataProvider : IMetadataProvider
     private readonly AniListClient _client;
     private readonly ILogger<AniListMetadataProvider> _logger;
     private readonly Func<AnimeListItem, CancellationToken, Task<IReadOnlyList<string>>>? _aliases;
+    private string? _lastMiss;
+    private IReadOnlyList<AniListMedia>? _lastCandidates;
 
     public AniListMetadataProvider(
         AniListClient client,
@@ -33,8 +35,12 @@ public sealed class AniListMetadataProvider : IMetadataProvider
 
     public string Name => ProviderName;
 
+    public string? DescribeLastMiss() => _lastMiss;
+
     public async Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default)
     {
+        _lastMiss = null;
+        _lastCandidates = null;
         var direct = await TryResolveAsync(item.Title, null, cancellationToken).ConfigureAwait(false);
         if (direct is not null)
         {
@@ -45,16 +51,18 @@ public sealed class AniListMetadataProvider : IMetadataProvider
 
         if (_aliases is null)
         {
+            _lastMiss = FormatMiss([item.Title], _lastCandidates);
             _logger.LogWarning("AniList: {Title} not found, skipping.", item.Title);
             return null;
         }
 
         var aliases = await _aliases(item, cancellationToken).ConfigureAwait(false);
         var wanted = Normalize(item.Title);
-        var tried = 0;
+        var tried = new List<string> { item.Title };
+        var triedCount = 0;
         foreach (var alias in aliases)
         {
-            if (tried >= MaxAliasQueries)
+            if (triedCount >= MaxAliasQueries)
             {
                 break;
             }
@@ -64,7 +72,8 @@ public sealed class AniListMetadataProvider : IMetadataProvider
                 continue;
             }
 
-            tried++;
+            triedCount++;
+            tried.Add(alias);
             var via = await TryResolveAsync(alias, alias, cancellationToken).ConfigureAwait(false);
             if (via is not null)
             {
@@ -75,22 +84,52 @@ public sealed class AniListMetadataProvider : IMetadataProvider
             }
         }
 
+        _lastMiss = FormatMiss(tried, _lastCandidates);
         _logger.LogWarning(
-            "AniList: {Title} not found ({Tried} alias queries), skipping.", item.Title, tried);
+            "AniList: {Title} not found ({Tried} alias queries), skipping.", item.Title, triedCount);
         return null;
     }
+
+    private static string? FormatMiss(IReadOnlyList<string> tried, IReadOnlyList<AniListMedia>? candidates)
+    {
+        var parts = new List<string>(2);
+        var closest = (candidates ?? [])
+            .Select(c => c.Title?.Romaji ?? c.Title?.English ?? c.Title?.Native)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Take(3)
+            .ToList();
+        if (closest.Count > 0)
+        {
+            parts.Add("closest: " + string.Join(", ", closest.Select(t => $"'{Truncate(t!, 60)}'")));
+        }
+
+        if (tried.Count > 1)
+        {
+            parts.Add("tried: " + string.Join(", ", tried.Take(6)));
+        }
+
+        return parts.Count == 0 ? null : string.Join("; ", parts);
+    }
+
+    private static string Truncate(string value, int max) =>
+        value.Length <= max ? value : value[..max] + "…";
 
     private async Task<ResolvedMedia?> TryResolveAsync(
         string query, string? matchedAlias, CancellationToken cancellationToken)
     {
         var candidates = await _client.SearchAnimeAsync(query, cancellationToken).ConfigureAwait(false);
+        if (candidates.Count > 0)
+        {
+            _lastCandidates = candidates;
+        }
         if (candidates.Count == 0)
         {
             return null;
         }
 
         var match = candidates.FirstOrDefault(c => IsTitleMatch(c, query))
-            ?? UniqueStrippedMatch(candidates, query);
+            ?? UniqueStrippedMatch(candidates, query)
+            ?? UniqueCompactMatch(candidates, query);
         if (match is null)
         {
             return null;
@@ -160,6 +199,46 @@ public sealed class AniListMetadataProvider : IMetadataProvider
 
     public static string StripYear(string normalizedTitle) =>
         System.Text.RegularExpressions.Regex.Replace(normalizedTitle, @"\s*\(\d{4}\)$", "");
+
+    /// <summary>
+    /// Last-resort fallback for spacing/punctuation variants ("Toukutsu Ou" vs
+    /// synonym "Toukutsuou"). Compares with all non-letters/numbers stripped —
+    /// and only when exactly one candidate matches, otherwise still ambiguous.
+    /// </summary>
+    public static AniListMedia? UniqueCompactMatch(IReadOnlyList<AniListMedia> candidates, string title)
+    {
+        var wanted = Compact(Normalize(title));
+        if (wanted.Length == 0)
+        {
+            return null;
+        }
+
+        AniListMedia? found = null;
+        foreach (var c in candidates)
+        {
+            var hit = (c.Title?.Romaji is not null && Compact(Normalize(c.Title.Romaji)) == wanted)
+                || (c.Title?.English is not null && Compact(Normalize(c.Title.English)) == wanted)
+                || (c.Title?.Native is not null && Compact(Normalize(c.Title.Native)) == wanted)
+                || (c.Synonyms is not null
+                    && c.Synonyms.Any(s => s is not null && Compact(Normalize(s)) == wanted));
+            if (!hit)
+            {
+                continue;
+            }
+
+            if (found is not null)
+            {
+                return null; // more than one — still ambiguous
+            }
+
+            found = c;
+        }
+
+        return found;
+    }
+
+    public static string Compact(string normalizedTitle) =>
+        System.Text.RegularExpressions.Regex.Replace(normalizedTitle, @"[^\p{L}\p{N}]", "");
 
     public static MediaType? MapFormat(string? format) => format?.Trim().ToUpperInvariant() switch
     {
