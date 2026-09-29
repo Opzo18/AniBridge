@@ -24,8 +24,11 @@
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ShindenPassword">Password</label>
-                    <input id="ShindenPassword" type="password" is="emby-input" autocomplete="off" />
-                    <div class="fieldDescription"><a href="#" id="ShindenShowPass">Show</a> · stored only in Jellyfin config, never logged.</div>
+                    <div style="position:relative;">
+                        <input id="ShindenPassword" type="password" is="emby-input" autocomplete="off" style="padding-right:2.5em;width:100%;box-sizing:border-box;" />
+                        <button id="ShindenShowPass" type="button" title="Show password" aria-label="Show password"
+                            style="position:absolute;right:0.4em;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1em;opacity:0.75;">👁</button>
+                    </div>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ShindenUserId">List ID (e.g. 420984-opzo)</label>
@@ -306,44 +309,57 @@
             return groups;
         }
 
+        function aniBridgeActionLink(parent, text, href, onClick) {
+            var a = document.createElement('a');
+            a.href = href || '#';
+            a.textContent = text;
+            a.style.cssText = 'text-decoration:none;opacity:0.65;font-size:0.85em;';
+            if (href) { a.target = '_blank'; a.rel = 'noopener'; }
+            if (onClick) {
+                a.addEventListener('click', onClick);
+            }
+            parent.appendChild(a);
+            return a;
+        }
+
         function aniBridgeRow(item) {
             var li = document.createElement('li');
-            li.style.marginBottom = '0.45em';
-            var top = document.createElement('div');
-            top.appendChild(aniBridgeChip(aniBridgeOutcomeName(item), aniBridgeOutcomeColor(item.outcome)));
-            top.appendChild(document.createTextNode(' '));
+            li.style.cssText = 'list-style:none;margin:0 0 0.7em;padding:0;';
+            var det = document.createElement('details');
+            var sum = document.createElement('summary');
+            sum.style.cssText = 'cursor:pointer;font-size:1.05em;';
+            sum.appendChild(aniBridgeChip(aniBridgeOutcomeName(item), aniBridgeOutcomeColor(item.outcome)));
+            sum.appendChild(document.createTextNode(' '));
             if (item.status) {
-                top.appendChild(aniBridgeChip(item.status, '#555'));
-                top.appendChild(document.createTextNode(' '));
+                sum.appendChild(aniBridgeChip(item.status, '#555'));
+                sum.appendChild(document.createTextNode(' '));
             }
             var title = document.createElement('strong');
             title.textContent = item.title;
-            top.appendChild(title);
-            li.appendChild(top);
+            sum.appendChild(title);
+            det.appendChild(sum);
             var links = document.createElement('div');
-            links.style.cssText = 'font-size:0.85em;opacity:0.8;';
+            links.style.cssText = 'padding:0.15em 0 0 1.4em;';
+            var needSep = false;
+            function sep() {
+                if (needSep) { links.appendChild(document.createTextNode(' · ')); }
+                needSep = true;
+            }
             if (item.sourceUrl) {
-                var a1 = document.createElement('a');
-                a1.href = item.sourceUrl; a1.target = '_blank'; a1.rel = 'noopener';
-                a1.textContent = 'Shinden';
-                links.appendChild(a1);
-                links.appendChild(document.createTextNode(' · '));
+                sep();
+                aniBridgeActionLink(links, 'Shinden', item.sourceUrl);
             }
             if (item.aniListUrl) {
-                var a2 = document.createElement('a');
-                a2.href = item.aniListUrl; a2.target = '_blank'; a2.rel = 'noopener';
-                a2.textContent = 'AniList';
-                links.appendChild(a2);
-                links.appendChild(document.createTextNode(' · '));
+                sep();
+                aniBridgeActionLink(links, 'AniList', item.aniListUrl);
             }
-            var copy = document.createElement('a');
-            copy.href = '#'; copy.textContent = 'Copy title';
-            copy.addEventListener('click', function (e) {
+            sep();
+            aniBridgeActionLink(links, 'Copy title', null, function (e) {
                 e.preventDefault();
                 if (navigator.clipboard) { navigator.clipboard.writeText(item.title); }
             });
-            links.appendChild(copy);
-            li.appendChild(links);
+            det.appendChild(links);
+            li.appendChild(det);
             return li;
         }
 
@@ -367,8 +383,11 @@
         function aniBridgeFillList(id, items, limit, emptyText) {
             var ul = document.querySelector('#' + id);
             ul.innerHTML = '';
+            ul.style.listStyle = 'none';
+            ul.style.paddingLeft = '0';
             if (items.length === 0) {
                 var none = document.createElement('li');
+                none.style.listStyle = 'none';
                 none.textContent = emptyText || '—';
                 ul.appendChild(none);
                 return;
@@ -389,6 +408,7 @@
             });
             if (items.length > shown) {
                 var more = document.createElement('li');
+                more.style.listStyle = 'none';
                 more.textContent = '…and ' + (items.length - shown) + ' more (use search to narrow down)';
                 ul.appendChild(more);
             }
@@ -567,7 +587,11 @@
         document.querySelector('#ShindenShowPass').addEventListener('click', function (e) {
             e.preventDefault();
             var input = document.querySelector('#ShindenPassword');
-            input.type = input.type === 'password' ? 'text' : 'password';
+            var show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            this.textContent = show ? '🙈' : '👁';
+            this.title = show ? 'Hide password' : 'Show password';
+            this.setAttribute('aria-label', this.title);
         });
 
         document.querySelector('#AniBridgeTestShinden').addEventListener('click', function () {

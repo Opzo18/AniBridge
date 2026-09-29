@@ -8,12 +8,20 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.4.3.0",
+        "changelog": "Miss diagnostics (closest/tried in skipped details), spacing-proof fallback matching, Shinden aliases debug endpoint, chip headers.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.3/anibridge_0.4.3.zip",
+        "checksum": "2459eb2a20e8e8bb18d3a7705d446493",
+        "timestamp": "2026-09-29 10:53:33"
+      },
+      {
         "version": "0.4.2.0",
         "changelog": "Miss diagnostics (closest/tried in skipped details), spacing-proof fallback matching, Shinden aliases debug endpoint, chip headers.",
         "targetAbi": "12.1.0.0",
         "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.2/anibridge_0.4.2.zip",
-        "checksum": "b42eb237a2b9c35945d2ed0d7821eb80",
-        "timestamp": "2026-09-29 10:35:21"
+        "checksum": "827a78350d8f7b92aea7f7a7ac4953a1",
+        "timestamp": "2026-09-29 10:50:34"
       },
       {
         "version": "0.4.1.0",

@@ -24,8 +24,12 @@
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">API key</label>
-                    <input id="RadarrApiKey" type="password" is="emby-input" autocomplete="off" />
-                    <div class="fieldDescription">Settings → General → Security in Radarr. <a href="#" id="RadarrShowKey">Show</a></div>
+                    <div style="position:relative;">
+                        <input id="RadarrApiKey" type="password" is="emby-input" autocomplete="off" style="padding-right:2.5em;width:100%;box-sizing:border-box;" />
+                        <button id="RadarrShowKey" type="button" title="Show API key" aria-label="Show API key"
+                            style="position:absolute;right:0.4em;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1em;opacity:0.75;">👁</button>
+                    </div>
+                    <div class="fieldDescription">Settings → General → Security in Radarr.</div>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="RadarrQualityProfileId">Quality profile</label>
@@ -286,7 +290,11 @@
         document.querySelector('#RadarrShowKey').addEventListener('click', function (e) {
             e.preventDefault();
             var input = document.querySelector('#RadarrApiKey');
-            input.type = input.type === 'password' ? 'text' : 'password';
+            var show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            this.textContent = show ? '🙈' : '👁';
+            this.title = show ? 'Hide API key' : 'Show API key';
+            this.setAttribute('aria-label', this.title);
         });
 
         document.querySelector('#AniBridgeRadarrForm').addEventListener('submit', function (e) {
