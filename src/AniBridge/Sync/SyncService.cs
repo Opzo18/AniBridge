@@ -156,10 +156,10 @@ public sealed class SyncService
                 const string detail = "unrecognized title";
                 var miss = _metadata.DescribeLastMiss();
                 return new SyncItem(
-                    item.Title, item.Status, SyncOutcome.Skipped,
+                    item.Title, item.Status, SyncOutcome.Failed,
                     miss is null ? detail : $"{detail} ({miss})",
                     item.Url, null,
-                    ErrorHints.ForDetail(SyncOutcome.Skipped, detail));
+                    ErrorHints.ForDetail(SyncOutcome.Failed, detail));
             }
 
             var aniListUrl = "https://anilist.co/anime/" + media.AniListId;
@@ -187,9 +187,9 @@ public sealed class SyncService
                 {
                     const string noMatch = "no exact match in Sonarr/Radarr catalog";
                     return new SyncItem(
-                        item.Title, item.Status, SyncOutcome.Skipped,
+                        item.Title, item.Status, SyncOutcome.Failed,
                         $"{noMatch} ({arr.Name})", item.Url, aniListUrl,
-                        ErrorHints.ForDetail(SyncOutcome.Skipped, noMatch), arr.Name);
+                        ErrorHints.ForDetail(SyncOutcome.Failed, noMatch), arr.Name);
                 }
 
                 var wouldAddDetail = media.MatchedAlias is null
@@ -204,9 +204,9 @@ public sealed class SyncService
                 _logger.LogInformation(
                     "AniBridge: {Title} not added to {Arr} (no exact match).", item.Title, arr.Name);
                 return new SyncItem(
-                    item.Title, item.Status, SyncOutcome.Skipped,
+                    item.Title, item.Status, SyncOutcome.Failed,
                     $"{noMatch} ({arr.Name})", item.Url, aniListUrl,
-                    ErrorHints.ForDetail(SyncOutcome.Skipped, noMatch), arr.Name);
+                    ErrorHints.ForDetail(SyncOutcome.Failed, noMatch), arr.Name);
             }
 
             return new SyncItem(item.Title, item.Status, SyncOutcome.Added, null, item.Url, aniListUrl, null, arr.Name);

@@ -8,6 +8,14 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.4.6.0",
+        "changelog": "No-match now Failed, sequel matching (AniList synonyms, punctuation-tolerant normalize, season-base fallback), Flow line removed.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.6/anibridge_0.4.6.zip",
+        "checksum": "7ed8ad5c9921e6b796f32170fc64bfce",
+        "timestamp": "2026-09-29 12:53:22"
+      },
+      {
         "version": "0.4.5.0",
         "changelog": "Fix false Added (no-match now Skipped), Sonarr/Radarr canonical title fallback, Target chip.",
         "targetAbi": "12.1.0.0",

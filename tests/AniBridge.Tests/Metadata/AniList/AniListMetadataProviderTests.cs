@@ -78,6 +78,22 @@ public class AniListMetadataProviderTests
     }
 
     [Fact]
+    public async Task ResolveAsync_PassesSynonymsThrough_ForArrLookup()
+    {
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":187538,"title":{"romaji":"Toukutsu Ou","english":"Tomb Raider King","native":"도굴왕"},"synonyms":["Dogulwang","Dogul Wang"],"format":"TV","episodes":12,"startDate":{"year":2026}}
+            ]}}}
+            """;
+
+        var media = await CreateProvider(Json).ResolveAsync(Item("Dogulwang"));
+
+        Assert.NotNull(media);
+        Assert.NotNull(media.Synonyms);
+        Assert.Contains("Dogul Wang", media.Synonyms);
+    }
+
+    [Fact]
     public async Task ResolveAsync_SynonymMatchWithYearSuffix_FallsBackToStripped()
     {
         const string Json = """

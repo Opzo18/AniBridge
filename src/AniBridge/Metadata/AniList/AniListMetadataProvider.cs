@@ -52,7 +52,7 @@ public sealed class AniListMetadataProvider : IMetadataProvider
         if (_aliases is null)
         {
             _lastMiss = FormatMiss([item.Title], _lastCandidates);
-            _logger.LogWarning("AniList: {Title} not found, skipping.", item.Title);
+            _logger.LogWarning("AniList: {Title} not found, marking as failed.", item.Title);
             return null;
         }
 
@@ -86,7 +86,7 @@ public sealed class AniListMetadataProvider : IMetadataProvider
 
         _lastMiss = FormatMiss(tried, _lastCandidates);
         _logger.LogWarning(
-            "AniList: {Title} not found ({Tried} alias queries), skipping.", item.Title, triedCount);
+            "AniList: {Title} not found ({Tried} alias queries), marking as failed.", item.Title, triedCount);
         return null;
     }
 
@@ -148,9 +148,16 @@ public sealed class AniListMetadataProvider : IMetadataProvider
             english = null;
         }
 
+        IReadOnlyList<string>? synonyms = match.Synonyms?
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .ToList();
+
         return new ResolvedMedia(
             query, type.Value, match.Id, null, match.StartDate?.Year, match.Episodes, matchedAlias,
-            canonical, english);
+            canonical, english, synonyms);
     }
 
     public static bool IsTitleMatch(AniListMedia candidate, string title)

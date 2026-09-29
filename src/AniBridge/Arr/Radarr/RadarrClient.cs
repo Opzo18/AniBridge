@@ -119,7 +119,7 @@ public sealed class RadarrClient : IArrClient
         if (movie is null)
         {
             _logger.LogWarning(
-                "Radarr: no exact match for {Title} (tried {Candidates}), skipping.",
+                "Radarr: no exact match for {Title} (tried {Candidates}), not adding.",
                 media.Title, string.Join(", ", CandidateTitles(media)));
             return false;
         }
@@ -198,32 +198,8 @@ public sealed class RadarrClient : IArrClient
             stream, JsonOptions, cancellationToken).ConfigureAwait(false) ?? [];
     }
 
-    private static string Normalize(string title)
-    {
-        var s = title.Trim().ToLowerInvariant()
-            .Replace('’', '\'').Replace('‘', '\'').Replace('`', '\'');
-        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
-        return s.TrimEnd('.', '!', '?', '…');
-    }
+    private static string Normalize(string title) => ArrTitles.Normalize(title);
 
-    internal static IReadOnlyList<string> CandidateTitles(ResolvedMedia media)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var list = new List<string>(4);
-        foreach (var t in new[] { media.CanonicalTitle, media.EnglishTitle, media.Title, media.MatchedAlias })
-        {
-            if (string.IsNullOrWhiteSpace(t))
-            {
-                continue;
-            }
-
-            var trimmed = t.Trim();
-            if (seen.Add(Normalize(trimmed)))
-            {
-                list.Add(trimmed);
-            }
-        }
-
-        return list;
-    }
+    internal static IReadOnlyList<string> CandidateTitles(ResolvedMedia media) =>
+        ArrTitles.CandidateTitles(media);
 }

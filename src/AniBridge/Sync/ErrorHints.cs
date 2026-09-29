@@ -22,8 +22,8 @@ public static class ErrorHints
                 => "Check the root folder setting on the Sonarr/Radarr page.",
             SyncOutcome.Failed when Contains(d, "quality profile") || Contains(d, "qualityprofile")
                 => "Check the quality profile setting on the Sonarr/Radarr page.",
-            SyncOutcome.Skipped when Contains(d, "unrecognized title") || Contains(d, "no exact match")
-                => "No confident AniList match — skipped on purpose, never guessed. Fix the title or add it manually to Sonarr/Radarr.",
+            SyncOutcome.Failed when Contains(d, "unrecognized title") || Contains(d, "no exact match")
+                => "No confident match — not added on purpose, never guessed. Fix the title or add it manually to Sonarr/Radarr.",
             SyncOutcome.Skipped when Contains(d, "Sonarr/Radarr disabled")
                 => "Enable Sonarr (TV) or Radarr (movies) on their settings pages.",
             SyncOutcome.Skipped when Contains(d, "status disabled")

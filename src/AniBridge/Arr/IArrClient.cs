@@ -22,7 +22,7 @@ public interface IArrClient
 
     /// <summary>
     /// Returns true when the item was posted to *Arr, false when there was
-    /// no exact catalog match (caller reports Skipped, never Added).
+    /// no exact catalog match (caller reports Failed, never Added).
     /// </summary>
     Task<bool> AddAsync(ResolvedMedia media, AnimeStatus status, CancellationToken cancellationToken = default);
 }

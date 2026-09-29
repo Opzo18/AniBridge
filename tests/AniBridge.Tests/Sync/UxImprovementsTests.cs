@@ -16,7 +16,8 @@ public class UxImprovementsTests
     [Theory]
     [InlineData(SyncOutcome.Failed, "401 Unauthorized", "API key")]
     [InlineData(SyncOutcome.Failed, "Connection refused", "Unreachable")]
-    [InlineData(SyncOutcome.Skipped, "unrecognized title", "AniList")]
+    [InlineData(SyncOutcome.Failed, "unrecognized title", "confident")]
+    [InlineData(SyncOutcome.Failed, "no exact match", "manually")]
     [InlineData(SyncOutcome.Skipped, "Sonarr/Radarr disabled", "Enable Sonarr")]
     [InlineData(SyncOutcome.Skipped, "status disabled in configuration", "unchecked")]
     public void ErrorHints_MapsToActionableText(SyncOutcome outcome, string detail, string expectedFragment)
@@ -250,7 +251,7 @@ public class UxImprovementsTests
         var result = await service.RunAsync();
 
         var item = Assert.Single(result.Items);
-        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        Assert.Equal(SyncOutcome.Failed, item.Outcome);
         Assert.StartsWith("unrecognized title", item.Detail, StringComparison.Ordinal);
         Assert.Contains("closest:", item.Detail, StringComparison.OrdinalIgnoreCase);
     }

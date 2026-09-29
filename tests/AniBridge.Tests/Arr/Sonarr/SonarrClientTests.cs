@@ -114,6 +114,40 @@ public class SonarrClientTests
     }
 
     [Fact]
+    public async Task AddAsync_SeasonBaseFallback_MatchesBaseSeries()
+    {
+        // Sequel title misses, stripped base ("MF Ghost") hits the catalog.
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("[]")); // "MF Ghost Final Season": no match
+        handler.Enqueue(Json("""[{"id":0,"title":"MF Ghost","tvdbId":555,"alternateTitles":[]}]"""));
+        handler.Enqueue(Json("""{"id":6,"title":"MF Ghost","tvdbId":555}""")); // POST
+        var client = CreateClient(handler);
+
+        Assert.True(await client.AddAsync(Media("MF Ghost Final Season"), AnimeStatus.Watching));
+
+        Assert.Single(handler.Requests, r => r.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task AddAsync_SynonymCandidate_MatchesOnSynonym()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("[]")); // canonical miss
+        handler.Enqueue(Json("[]")); // english miss
+        handler.Enqueue(Json("[]")); // list title miss
+        handler.Enqueue(Json(LookupJson)); // synonym "Your Name" hit
+        handler.Enqueue(Json("""{"id":5,"title":"Kimi no Na wa.","tvdbId":314095}""")); // POST
+        var client = CreateClient(handler);
+
+        var media = new ResolvedMedia(
+            "Some List Title", MediaType.Tv, 21519, null, 2016, 1, null,
+            "Some Canonical", "Some English", ["Your Name"]);
+        Assert.True(await client.AddAsync(media, AnimeStatus.Watching));
+
+        Assert.Single(handler.Requests, r => r.Method == HttpMethod.Post);
+    }
+
+    [Fact]
     public async Task HasMatchAsync_NoMatch_ReturnsFalse()
     {
         var handler = new QueueHandler();

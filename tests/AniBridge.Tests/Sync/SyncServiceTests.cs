@@ -86,7 +86,7 @@ public class SyncServiceTests
 
         var result = await service.RunAsync();
 
-        Assert.Equal("Scanned: 4, Added: 2, AlreadyExists: 1, Skipped: 1, Failed: 0, WouldAdd: 0", result.ToString());
+        Assert.Equal("Scanned: 4, Added: 2, AlreadyExists: 1, Skipped: 0, Failed: 1, WouldAdd: 0", result.ToString());
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class SyncServiceTests
     }
 
     [Fact]
-    public async Task RunAsync_NoArrMatch_MarksSkippedInsteadOfAdded()
+    public async Task RunAsync_NoArrMatch_MarksFailedInsteadOfAdded()
     {
         var provider = new FakeProvider(Item("Missing Show"));
         var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>
@@ -233,16 +233,16 @@ public class SyncServiceTests
         var result = await service.RunAsync();
 
         var item = Assert.Single(result.Items);
-        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        Assert.Equal(SyncOutcome.Failed, item.Outcome);
         Assert.Contains("no exact match", item.Detail, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Sonarr", item.Target);
         Assert.Equal(0, result.Added);
-        Assert.Equal(1, result.Skipped);
+        Assert.Equal(1, result.Failed);
         Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
     }
 
     [Fact]
-    public async Task RunAsync_DryRun_NoArrMatch_MarksSkipped()
+    public async Task RunAsync_DryRun_NoArrMatch_MarksFailed()
     {
         var provider = new FakeProvider(Item("Missing Show"));
         var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>
@@ -263,7 +263,7 @@ public class SyncServiceTests
         var result = await service.RunAsync();
 
         var item = Assert.Single(result.Items);
-        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        Assert.Equal(SyncOutcome.Failed, item.Outcome);
         Assert.Equal(0, result.WouldAdd);
     }
 

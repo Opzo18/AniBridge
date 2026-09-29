@@ -3,15 +3,13 @@
 A Jellyfin plugin that syncs anime lists from external services (starting with **Shinden.pl**)
 with **Sonarr** (TV shows) and **Radarr** (movies).
 
-Flow: `Shinden → AniBridge → AniList → Sonarr/Radarr → download → Jellyfin`
-
 AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themselves.
 
 ## Status
 
-Version **0.4.5** live: fix false Added (no-match now Skipped),
-Sonarr/Radarr canonical title fallback, Target chip. ✅
-(`dotnet test`: 128/128 passed)
+Version **0.4.6** live: no-match now Failed, sequel matching (AniList synonyms,
+punctuation-tolerant normalize, season-base fallback), Flow line removed. ✅
+(`dotnet test`: 147/147 passed)
 
 ## Requirements
 
@@ -70,14 +68,14 @@ dotnet test AniBridge.slnx
 - First full sync of a large list takes a while (AniList allows ~90 requests/min,
   AniBridge paces itself) — this is normal; watch the task progress.
 
-Rules: TV → Sonarr, movies → Radarr; an uncertain title = skipped + warning (never guessing);
+Rules: TV → Sonarr, movies → Radarr; an uncertain title = failed + hint (never guessing);
 an existing entry = no action; nothing is ever deleted — neither entries nor files.
 
 ## Diagnostics
 
 - `Sonarr/Radarr is not configured` in the logs → fill in the URL and API key, restart.
 - `no exact match` → a Shinden title does not match Sonarr/Radarr/AniList;
-  the entry is skipped, the rest of the list keeps syncing.
+  the entry is marked failed, the rest of the list keeps syncing.
 - `failed to fetch the Shinden list` → the session expired or Shinden changed its HTML;
   check the login/password and report with a log snippet.
 
