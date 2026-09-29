@@ -20,6 +20,9 @@ public class SonarrClientTests
     private static ResolvedMedia Media(string title) =>
         new(title, MediaType.Tv, 21519, null, 2016, 1);
 
+    private static ResolvedMedia MediaWithCanonical(string title, string? canonical, string? english = null) =>
+        new(title, MediaType.Tv, 21519, null, 2016, 1, null, canonical, english);
+
     private static SonarrClient CreateClient(QueueHandler handler)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:8989/api/v3/") };
@@ -69,7 +72,7 @@ public class SonarrClientTests
         handler.Enqueue(Json("""{"id":5,"title":"Kimi no Na wa.","tvdbId":314095}""")); // POST ответ
         var client = CreateClient(handler);
 
-        await client.AddAsync(Media("Your Name"), AnimeStatus.Watching);
+        Assert.True(await client.AddAsync(Media("Your Name"), AnimeStatus.Watching));
 
         var post = Assert.Single(handler.Requests, r => r.Method == HttpMethod.Post);
         Assert.Equal("http://localhost:8989/api/v3/series", post.RequestUri!.ToString());
@@ -89,9 +92,34 @@ public class SonarrClientTests
         var handler = new QueueHandler();
         handler.Enqueue(Json(LookupJson));
 
-        await CreateClient(handler).AddAsync(Media("Some Totally Different Title"), AnimeStatus.Watching);
+        Assert.False(await CreateClient(handler).AddAsync(Media("Some Totally Different Title"), AnimeStatus.Watching));
 
         Assert.Single(handler.Requests); // lookup only, no POST
+    }
+
+    [Fact]
+    public async Task AddAsync_CanonicalTitleFallback_MatchesOnSecondCandidate()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("[]")); // canonical miss
+        handler.Enqueue(Json(LookupJson)); // Shinden title hit
+        handler.Enqueue(Json("""{"id":5,"title":"Kimi no Na wa.","tvdbId":314095}""")); // POST
+        var client = CreateClient(handler);
+
+        var media = MediaWithCanonical("Your Name", "Some Totally Different Title");
+        Assert.True(await client.AddAsync(media, AnimeStatus.Watching));
+
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.Single(handler.Requests, r => r.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task HasMatchAsync_NoMatch_ReturnsFalse()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json(LookupJson));
+
+        Assert.False(await CreateClient(handler).HasMatchAsync(Media("Some Totally Different Title")));
     }
 
     [Fact]
@@ -104,7 +132,7 @@ public class SonarrClientTests
         var client = new SonarrClient(
             http, NullLogger<SonarrClient>.Instance, 1, "/tv", "future", "standard", false);
 
-        await client.AddAsync(Media("Your Name"), AnimeStatus.Planned);
+        Assert.True(await client.AddAsync(Media("Your Name"), AnimeStatus.Planned));
 
         var body = handler.Bodies.Single(b => b.Length > 0);
         Assert.Contains("\"monitor\":\"future\"", body);

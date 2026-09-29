@@ -73,23 +73,59 @@ public sealed class SonarrClient : IArrClient
 
     public async Task<bool> ExistsAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
     {
-        var series = await LookupExactAsync(media.Title, cancellationToken).ConfigureAwait(false);
-        if (series is null)
+        foreach (var title in CandidateTitles(media))
         {
+            var series = await LookupExactAsync(title, cancellationToken).ConfigureAwait(false);
+            if (series is null)
+            {
+                continue;
+            }
+
+            var existing = await GetByTvdbIdAsync(series.TvdbId, cancellationToken).ConfigureAwait(false);
+            if (existing.Count > 0)
+            {
+                return true;
+            }
+
+            // Found in catalog but not in library — no need to try other aliases.
             return false;
         }
 
-        var existing = await GetByTvdbIdAsync(series.TvdbId, cancellationToken).ConfigureAwait(false);
-        return existing.Count > 0;
+        return false;
     }
 
-    public async Task AddAsync(ResolvedMedia media, AnimeStatus status, CancellationToken cancellationToken = default)
+    public async Task<bool> HasMatchAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
     {
-        var series = await LookupExactAsync(media.Title, cancellationToken).ConfigureAwait(false);
+        foreach (var title in CandidateTitles(media))
+        {
+            var series = await LookupExactAsync(title, cancellationToken).ConfigureAwait(false);
+            if (series is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public async Task<bool> AddAsync(ResolvedMedia media, AnimeStatus status, CancellationToken cancellationToken = default)
+    {
+        SonarrSeries? series = null;
+        foreach (var title in CandidateTitles(media))
+        {
+            series = await LookupExactAsync(title, cancellationToken).ConfigureAwait(false);
+            if (series is not null)
+            {
+                break;
+            }
+        }
+
         if (series is null)
         {
-            _logger.LogWarning("Sonarr: no exact match for {Title}, skipping.", media.Title);
-            return;
+            _logger.LogWarning(
+                "Sonarr: no exact match for {Title} (tried {Candidates}), skipping.",
+                media.Title, string.Join(", ", CandidateTitles(media)));
+            return false;
         }
 
         var (monitored, search) = MapMonitorFlags(status);
@@ -116,6 +152,7 @@ public sealed class SonarrClient : IArrClient
         _logger.LogInformation(
             "Sonarr: added {Title} (tvdb {TvdbId}, monitor {Monitor}).",
             payload.Title, payload.TvdbId, _monitor);
+        return true;
     }
 
     /// <summary>
@@ -173,5 +210,26 @@ public sealed class SonarrClient : IArrClient
             .Replace('’', '\'').Replace('‘', '\'').Replace('`', '\'');
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
         return s.TrimEnd('.', '!', '?', '…');
+    }
+
+    internal static IReadOnlyList<string> CandidateTitles(ResolvedMedia media)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var list = new List<string>(4);
+        foreach (var t in new[] { media.CanonicalTitle, media.EnglishTitle, media.Title, media.MatchedAlias })
+        {
+            if (string.IsNullOrWhiteSpace(t))
+            {
+                continue;
+            }
+
+            var trimmed = t.Trim();
+            if (seen.Add(Normalize(trimmed)))
+            {
+                list.Add(trimmed);
+            }
+        }
+
+        return list;
     }
 }

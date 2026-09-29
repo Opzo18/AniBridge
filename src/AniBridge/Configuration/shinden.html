@@ -144,18 +144,35 @@
             return o[camel] !== undefined ? o[camel] : o[pascal];
         }
 
+        function abNormTarget(v, detail) {
+            if (typeof v === 'string' && v) {
+                var t = v.trim();
+                if (/^sonarr$/i.test(t)) { return 'Sonarr'; }
+                if (/^radarr$/i.test(t)) { return 'Radarr'; }
+                return t;
+            }
+            // Backward compat: old reports have no Target, only Detail="Sonarr[/Radarr]...".
+            if (typeof detail === 'string' && detail) {
+                if (/^\s*sonarr\b/i.test(detail)) { return 'Sonarr'; }
+                if (/^\s*radarr\b/i.test(detail)) { return 'Radarr'; }
+            }
+            return null;
+        }
+
         function abNormItem(i) {
             var rawOutcome = abPick(i, 'outcome', 'Outcome');
             var rawStatus = abPick(i, 'status', 'Status');
+            var detail = abPick(i, 'detail', 'Detail');
             return {
                 title: abPick(i, 'title', 'Title') || '',
                 outcome: abNormOutcome(rawOutcome),
                 outcomeRaw: (typeof rawOutcome === 'string') ? rawOutcome : null,
                 status: abNormStatusName(rawStatus),
-                detail: abPick(i, 'detail', 'Detail'),
+                detail: detail,
                 sourceUrl: abPick(i, 'sourceUrl', 'SourceUrl'),
                 aniListUrl: abPick(i, 'aniListUrl', 'AniListUrl'),
-                hint: abPick(i, 'hint', 'Hint')
+                hint: abPick(i, 'hint', 'Hint'),
+                target: abNormTarget(abPick(i, 'target', 'Target'), detail)
             };
         }
 
@@ -327,11 +344,18 @@
             return groups;
         }
 
+        function aniBridgeTargetColor(t) {
+            if (/^sonarr$/i.test(t || '')) { return '#8e44ad'; }
+            if (/^radarr$/i.test(t || '')) { return '#d35400'; }
+            return '#7f8c8d';
+        }
+
         function aniBridgeActionLink(parent, text, href, onClick) {
             var a = document.createElement('a');
             a.href = href || '#';
             a.textContent = text;
-            a.style.cssText = 'text-decoration:none;font-size:0.9em;';
+            a.style.cssText = 'color:#00a4dc;text-decoration:underline;font-size:1em;' +
+                'font-weight:500;padding:0.25em 0.15em;';
             if (href) { a.target = '_blank'; a.rel = 'noopener'; }
             if (onClick) {
                 a.addEventListener('click', onClick);
@@ -352,15 +376,25 @@
                 sum.appendChild(aniBridgeChip(item.status, '#555'));
                 sum.appendChild(document.createTextNode(' '));
             }
+            if (item.target) {
+                sum.appendChild(aniBridgeChip(item.target, aniBridgeTargetColor(item.target)));
+                sum.appendChild(document.createTextNode(' '));
+            }
             var title = document.createElement('strong');
             title.textContent = item.title;
             sum.appendChild(title);
             det.appendChild(sum);
             var links = document.createElement('div');
-            links.style.cssText = 'padding:0.15em 0 0 1.4em;';
+            links.style.cssText = 'padding:0.3em 0 0.3em 1.4em;display:flex;flex-wrap:wrap;' +
+                'align-items:center;gap:0.15em;';
             var needSep = false;
             function sep() {
-                if (needSep) { links.appendChild(document.createTextNode(' · ')); }
+                if (needSep) {
+                    var s = document.createElement('span');
+                    s.textContent = '·';
+                    s.style.cssText = 'color:#aaa;margin:0 0.35em;';
+                    links.appendChild(s);
+                }
                 needSep = true;
             }
             if (item.sourceUrl) {

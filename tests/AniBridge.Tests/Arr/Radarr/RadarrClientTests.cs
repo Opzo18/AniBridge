@@ -20,6 +20,9 @@ public class RadarrClientTests
     private static ResolvedMedia Media(string title) =>
         new(title, MediaType.Movie, 21519, null, 2016, 1);
 
+    private static ResolvedMedia MediaWithCanonical(string title, string? canonical) =>
+        new(title, MediaType.Movie, 21519, null, 2016, 1, null, canonical, null);
+
     private static RadarrClient CreateClient(QueueHandler handler)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:7878/api/v3/") };
@@ -58,7 +61,7 @@ public class RadarrClientTests
         handler.Enqueue(Json("""{"id":7,"title":"Kimi no Na wa.","tmdbId":372058,"year":2016}"""));
         var client = CreateClient(handler);
 
-        await client.AddAsync(Media("Your Name"), AnimeStatus.Planned);
+        Assert.True(await client.AddAsync(Media("Your Name"), AnimeStatus.Planned));
 
         var post = Assert.Single(handler.Requests, r => r.Method == HttpMethod.Post);
         Assert.Equal("http://localhost:7878/api/v3/movie", post.RequestUri!.ToString());
@@ -81,7 +84,7 @@ public class RadarrClientTests
         var client = new RadarrClient(
             http, NullLogger<RadarrClient>.Instance, 1, "/movies", "none", "announced");
 
-        await client.AddAsync(Media("Your Name"), AnimeStatus.Watching);
+        Assert.True(await client.AddAsync(Media("Your Name"), AnimeStatus.Watching));
 
         var body = handler.Bodies.Single(b => b.Length > 0);
         Assert.Contains("\"monitor\":\"none\"", body);
@@ -96,9 +99,18 @@ public class RadarrClientTests
         var handler = new QueueHandler();
         handler.Enqueue(Json(LookupJson));
 
-        await CreateClient(handler).AddAsync(Media("Some Totally Different Title"), AnimeStatus.Watching);
+        Assert.False(await CreateClient(handler).AddAsync(Media("Some Totally Different Title"), AnimeStatus.Watching));
 
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task HasMatchAsync_NoMatch_ReturnsFalse()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json(LookupJson));
+
+        Assert.False(await CreateClient(handler).HasMatchAsync(Media("Some Totally Different Title")));
     }
 
     [Theory]

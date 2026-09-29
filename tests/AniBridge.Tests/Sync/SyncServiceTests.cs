@@ -168,7 +168,8 @@ public class SyncServiceTests
         var handler = new QueueHandler();
         handler.Enqueue(Json("""[{"id":0,"title":"Dry Series","tvdbId":401}]"""));
         handler.Enqueue(Json("[]")); // not present
-        // NOTE: no lookup + POST for AddAsync — dry run must stop here.
+        handler.Enqueue(Json("""[{"id":0,"title":"Dry Series","tvdbId":401}]""")); // HasMatch lookup
+        // NOTE: no POST for AddAsync — dry run must stop here.
 
         var config = Config();
         config.DryRun = true;
@@ -181,7 +182,7 @@ public class SyncServiceTests
         var item = Assert.Single(result.Items);
         Assert.Equal(SyncOutcome.WouldAdd, item.Outcome);
         Assert.Equal(1, result.WouldAdd);
-        Assert.Equal(2, handler.Requests.Count); // lookup + exists check only
+        Assert.Equal(3, handler.Requests.Count); // lookup + exists check + HasMatch lookup
         Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
     }
 
@@ -197,6 +198,7 @@ public class SyncServiceTests
         var handler = new QueueHandler();
         handler.Enqueue(Json("""[{"id":0,"title":"Dogulwang","tvdbId":501}]"""));
         handler.Enqueue(Json("[]")); // not present
+        handler.Enqueue(Json("""[{"id":0,"title":"Dogulwang","tvdbId":501}]""")); // HasMatch lookup
 
         var config = Config();
         config.DryRun = true;
@@ -209,6 +211,60 @@ public class SyncServiceTests
         var item = Assert.Single(result.Items);
         Assert.Equal(SyncOutcome.WouldAdd, item.Outcome);
         Assert.Equal("Sonarr (as 'Tomb Raider King')", item.Detail);
+    }
+
+    [Fact]
+    public async Task RunAsync_NoArrMatch_MarksSkippedInsteadOfAdded()
+    {
+        var provider = new FakeProvider(Item("Missing Show"));
+        var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>
+        {
+            ["Missing Show"] = Tv("Missing Show"),
+        });
+
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("[]")); // Exists lookup: no match
+        handler.Enqueue(Json("[]")); // Add lookup: no match
+
+        var service = Create(provider, metadata, Config(),
+            new Lazy<SonarrClient>(() => Sonarr(handler)),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")));
+
+        var result = await service.RunAsync();
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        Assert.Contains("no exact match", item.Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Sonarr", item.Target);
+        Assert.Equal(0, result.Added);
+        Assert.Equal(1, result.Skipped);
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_NoArrMatch_MarksSkipped()
+    {
+        var provider = new FakeProvider(Item("Missing Show"));
+        var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>
+        {
+            ["Missing Show"] = Tv("Missing Show"),
+        });
+
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("[]")); // Exists lookup: no match
+        handler.Enqueue(Json("[]")); // HasMatch lookup: no match
+
+        var config = Config();
+        config.DryRun = true;
+        var service = Create(provider, metadata, config,
+            new Lazy<SonarrClient>(() => Sonarr(handler)),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")));
+
+        var result = await service.RunAsync();
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(SyncOutcome.Skipped, item.Outcome);
+        Assert.Equal(0, result.WouldAdd);
     }
 
     private sealed class FakeProvider(params AnimeListItem[] items) : IAnimeProvider

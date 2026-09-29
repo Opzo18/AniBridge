@@ -24,4 +24,5 @@ public sealed record SyncItem(
     string? Detail,
     string? SourceUrl = null,
     string? AniListUrl = null,
-    string? Hint = null);
+    string? Hint = null,
+    string? Target = null);

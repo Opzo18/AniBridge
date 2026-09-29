@@ -69,23 +69,59 @@ public sealed class RadarrClient : IArrClient
 
     public async Task<bool> ExistsAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
     {
-        var movie = await LookupExactAsync(media.Title, cancellationToken).ConfigureAwait(false);
-        if (movie is null)
+        foreach (var title in CandidateTitles(media))
         {
+            var movie = await LookupExactAsync(title, cancellationToken).ConfigureAwait(false);
+            if (movie is null)
+            {
+                continue;
+            }
+
+            var existing = await GetByTmdbIdAsync(movie.TmdbId, cancellationToken).ConfigureAwait(false);
+            if (existing.Count > 0)
+            {
+                return true;
+            }
+
+            // Found in catalog but not in library — no need to try other aliases.
             return false;
         }
 
-        var existing = await GetByTmdbIdAsync(movie.TmdbId, cancellationToken).ConfigureAwait(false);
-        return existing.Count > 0;
+        return false;
     }
 
-    public async Task AddAsync(ResolvedMedia media, AnimeStatus status, CancellationToken cancellationToken = default)
+    public async Task<bool> HasMatchAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
     {
-        var movie = await LookupExactAsync(media.Title, cancellationToken).ConfigureAwait(false);
+        foreach (var title in CandidateTitles(media))
+        {
+            var movie = await LookupExactAsync(title, cancellationToken).ConfigureAwait(false);
+            if (movie is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public async Task<bool> AddAsync(ResolvedMedia media, AnimeStatus status, CancellationToken cancellationToken = default)
+    {
+        RadarrMovie? movie = null;
+        foreach (var title in CandidateTitles(media))
+        {
+            movie = await LookupExactAsync(title, cancellationToken).ConfigureAwait(false);
+            if (movie is not null)
+            {
+                break;
+            }
+        }
+
         if (movie is null)
         {
-            _logger.LogWarning("Radarr: no exact match for {Title}, skipping.", media.Title);
-            return;
+            _logger.LogWarning(
+                "Radarr: no exact match for {Title} (tried {Candidates}), skipping.",
+                media.Title, string.Join(", ", CandidateTitles(media)));
+            return false;
         }
 
         var (monitored, search) = MapMonitorFlags(status);
@@ -111,6 +147,7 @@ public sealed class RadarrClient : IArrClient
         _logger.LogInformation(
             "Radarr: added {Title} (tmdb {TmdbId}, monitor {Monitor}).",
             payload.Title, payload.TmdbId, _monitor);
+        return true;
     }
 
     /// <summary>
@@ -167,5 +204,26 @@ public sealed class RadarrClient : IArrClient
             .Replace('’', '\'').Replace('‘', '\'').Replace('`', '\'');
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
         return s.TrimEnd('.', '!', '?', '…');
+    }
+
+    internal static IReadOnlyList<string> CandidateTitles(ResolvedMedia media)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var list = new List<string>(4);
+        foreach (var t in new[] { media.CanonicalTitle, media.EnglishTitle, media.Title, media.MatchedAlias })
+        {
+            if (string.IsNullOrWhiteSpace(t))
+            {
+                continue;
+            }
+
+            var trimmed = t.Trim();
+            if (seen.Add(Normalize(trimmed)))
+            {
+                list.Add(trimmed);
+            }
+        }
+
+        return list;
     }
 }

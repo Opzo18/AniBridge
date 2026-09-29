@@ -9,9 +9,9 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-Version **0.4.4** live: tab-bar navigation with status, Show/Hide buttons,
-brighter report actions. ✅
-(`dotnet test`: 123/123 passed)
+Version **0.4.5** live: fix false Added (no-match now Skipped),
+Sonarr/Radarr canonical title fallback, Target chip. ✅
+(`dotnet test`: 128/128 passed)
 
 ## Requirements
 

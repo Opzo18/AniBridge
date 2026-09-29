@@ -8,6 +8,14 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.4.5.0",
+        "changelog": "Fix false Added (no-match now Skipped), Sonarr/Radarr canonical title fallback, Target chip.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.5/anibridge_0.4.5.zip",
+        "checksum": "6d6f85f53bc4d8868e93f1ef22fc5034",
+        "timestamp": "2026-09-29 11:34:34"
+      },
+      {
         "version": "0.4.4.0",
         "changelog": "Tab-bar page navigation with status, Show/Hide buttons, brighter report actions.",
         "targetAbi": "12.1.0.0",

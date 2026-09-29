@@ -176,21 +176,40 @@ public sealed class SyncService
 
             if (await arr.ExistsAsync(media, cancellationToken).ConfigureAwait(false))
             {
-                return new SyncItem(item.Title, item.Status, SyncOutcome.AlreadyExists, null, item.Url, aniListUrl);
+                return new SyncItem(item.Title, item.Status, SyncOutcome.AlreadyExists, null, item.Url, aniListUrl, null, arr.Name);
             }
 
             if (config.DryRun)
             {
                 _logger.LogInformation(
                     "AniBridge (dry run): would add {Title} to {Arr}.", item.Title, arr.Name);
+                if (!await arr.HasMatchAsync(media, cancellationToken).ConfigureAwait(false))
+                {
+                    const string noMatch = "no exact match in Sonarr/Radarr catalog";
+                    return new SyncItem(
+                        item.Title, item.Status, SyncOutcome.Skipped,
+                        $"{noMatch} ({arr.Name})", item.Url, aniListUrl,
+                        ErrorHints.ForDetail(SyncOutcome.Skipped, noMatch), arr.Name);
+                }
+
                 var wouldAddDetail = media.MatchedAlias is null
                     ? arr.Name
                     : $"{arr.Name} (as '{media.MatchedAlias}')";
-                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, wouldAddDetail, item.Url, aniListUrl);
+                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, wouldAddDetail, item.Url, aniListUrl, null, arr.Name);
             }
 
-            await arr.AddAsync(media, item.Status, cancellationToken).ConfigureAwait(false);
-            return new SyncItem(item.Title, item.Status, SyncOutcome.Added, null, item.Url, aniListUrl);
+            if (!await arr.AddAsync(media, item.Status, cancellationToken).ConfigureAwait(false))
+            {
+                const string noMatch = "no exact match in Sonarr/Radarr catalog";
+                _logger.LogInformation(
+                    "AniBridge: {Title} not added to {Arr} (no exact match).", item.Title, arr.Name);
+                return new SyncItem(
+                    item.Title, item.Status, SyncOutcome.Skipped,
+                    $"{noMatch} ({arr.Name})", item.Url, aniListUrl,
+                    ErrorHints.ForDetail(SyncOutcome.Skipped, noMatch), arr.Name);
+            }
+
+            return new SyncItem(item.Title, item.Status, SyncOutcome.Added, null, item.Url, aniListUrl, null, arr.Name);
         }
         catch (Exception ex)
         {

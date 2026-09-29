@@ -141,8 +141,16 @@ public sealed class AniListMetadataProvider : IMetadataProvider
             return null;
         }
 
+        var canonical = match.Title?.Romaji ?? match.Title?.English;
+        var english = match.Title?.English;
+        if (string.Equals(english, canonical, StringComparison.OrdinalIgnoreCase))
+        {
+            english = null;
+        }
+
         return new ResolvedMedia(
-            query, type.Value, match.Id, null, match.StartDate?.Year, match.Episodes, matchedAlias);
+            query, type.Value, match.Id, null, match.StartDate?.Year, match.Episodes, matchedAlias,
+            canonical, english);
     }
 
     public static bool IsTitleMatch(AniListMedia candidate, string title)
