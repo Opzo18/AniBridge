@@ -24,14 +24,26 @@ public sealed class SonarrClient : IArrClient
     private readonly ILogger<SonarrClient> _logger;
     private readonly int _qualityProfileId;
     private readonly string _rootFolderPath;
+    private readonly string _monitor;
+    private readonly string _seriesType;
+    private readonly bool _seasonFolder;
 
     public SonarrClient(
-        HttpClient http, ILogger<SonarrClient> logger, int qualityProfileId, string rootFolderPath)
+        HttpClient http,
+        ILogger<SonarrClient> logger,
+        int qualityProfileId,
+        string rootFolderPath,
+        string monitor = "all",
+        string seriesType = "anime",
+        bool seasonFolder = true)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _qualityProfileId = qualityProfileId;
         _rootFolderPath = rootFolderPath ?? throw new ArgumentNullException(nameof(rootFolderPath));
+        _monitor = string.IsNullOrWhiteSpace(monitor) ? "all" : monitor.Trim().ToLowerInvariant();
+        _seriesType = string.IsNullOrWhiteSpace(seriesType) ? "anime" : seriesType.Trim().ToLowerInvariant();
+        _seasonFolder = seasonFolder;
     }
 
     public string Name => ClientName;
@@ -40,7 +52,14 @@ public sealed class SonarrClient : IArrClient
     /// Production factory: BaseAddress from configuration + X-Api-Key header.
     /// </summary>
     public static SonarrClient CreateDefault(
-        ILogger<SonarrClient> logger, string baseUrl, string apiKey, int qualityProfileId, string rootFolderPath)
+        ILogger<SonarrClient> logger,
+        string baseUrl,
+        string apiKey,
+        int qualityProfileId,
+        string rootFolderPath,
+        string monitor = "all",
+        string seriesType = "anime",
+        bool seasonFolder = true)
     {
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
         {
@@ -49,7 +68,7 @@ public sealed class SonarrClient : IArrClient
         var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/api/v3/") };
         http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
         http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return new SonarrClient(http, logger, qualityProfileId, rootFolderPath);
+        return new SonarrClient(http, logger, qualityProfileId, rootFolderPath, monitor, seriesType, seasonFolder);
     }
 
     public async Task<bool> ExistsAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
@@ -73,18 +92,20 @@ public sealed class SonarrClient : IArrClient
             return;
         }
 
-        var (monitored, monitor, search) = MapMonitoring(status);
+        var (monitored, search) = MapMonitorFlags(status);
         var payload = new SonarrNewSeries
         {
             Title = series.Title ?? media.Title,
             TvdbId = series.TvdbId,
             QualityProfileId = _qualityProfileId,
             RootFolderPath = _rootFolderPath,
+            SeasonFolder = _seasonFolder,
             Monitored = monitored,
-            MonitorNewItems = monitor,
+            MonitorNewItems = _monitor,
+            SeriesType = _seriesType,
             AddOptions = new SonarrAddOptions
             {
-                Monitor = monitor,
+                Monitor = _monitor,
                 SearchForMissingEpisodes = search,
             },
         };
@@ -94,22 +115,23 @@ public sealed class SonarrClient : IArrClient
         resp.EnsureSuccessStatusCode();
         _logger.LogInformation(
             "Sonarr: added {Title} (tvdb {TvdbId}, monitor {Monitor}).",
-            payload.Title, payload.TvdbId, monitor);
+            payload.Title, payload.TvdbId, _monitor);
     }
 
     /// <summary>
-    /// Maps user status to monitoring. Completed/Dropped neither search
-    /// nor monitor new episodes; Watching searches for missing episodes immediately.
+    /// Maps user status to monitoring flags. The monitor mode itself comes from
+    /// configuration (SonarrMonitor, default "all"); Completed/Dropped neither
+    /// search nor monitor new episodes; Watching searches for missing episodes immediately.
     /// </summary>
-    public static (bool Monitored, string Monitor, bool Search) MapMonitoring(AnimeStatus status) =>
+    public static (bool Monitored, bool Search) MapMonitorFlags(AnimeStatus status) =>
         status switch
         {
-            AnimeStatus.Watching => (true, "all", true),
-            AnimeStatus.Planned => (true, "future", false),
-            AnimeStatus.OnHold => (true, "none", false),
-            AnimeStatus.Completed => (false, "none", false),
-            AnimeStatus.Dropped => (false, "none", false),
-            _ => (false, "none", false),
+            AnimeStatus.Watching => (true, true),
+            AnimeStatus.Planned => (true, false),
+            AnimeStatus.OnHold => (true, false),
+            AnimeStatus.Completed => (false, false),
+            AnimeStatus.Dropped => (false, false),
+            _ => (false, false),
         };
 
     private async Task<SonarrSeries?> LookupExactAsync(string title, CancellationToken cancellationToken)

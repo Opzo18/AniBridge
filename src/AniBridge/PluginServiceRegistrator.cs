@@ -38,7 +38,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
                 config?.SonarrUrl ?? string.Empty,
                 config?.SonarrApiKey ?? string.Empty,
                 config?.SonarrQualityProfileId ?? 1,
-                config?.SonarrRootFolder ?? string.Empty);
+                config?.SonarrRootFolder ?? string.Empty,
+                config?.SonarrMonitor ?? "all",
+                config?.SonarrSeriesType ?? "anime",
+                config?.SonarrSeasonFolder ?? true);
         });
         serviceCollection.AddSingleton<RadarrClient>(sp =>
         {
@@ -48,7 +51,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
                 config?.RadarrUrl ?? string.Empty,
                 config?.RadarrApiKey ?? string.Empty,
                 config?.RadarrQualityProfileId ?? 1,
-                config?.RadarrRootFolder ?? string.Empty);
+                config?.RadarrRootFolder ?? string.Empty,
+                config?.RadarrMonitor ?? "movieOnly",
+                config?.RadarrAvailability ?? "released");
         });
         serviceCollection.AddSingleton(sp =>
             new Lazy<SonarrClient>(sp.GetRequiredService<SonarrClient>));

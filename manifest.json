@@ -12,8 +12,8 @@
         "changelog": "Smarter AniList matching: synonyms plus retry queries from Shinden alternate titles (exact matches only).",
         "targetAbi": "12.1.0.0",
         "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.1/anibridge_0.4.1.zip",
-        "checksum": "1ef06499dff2fe9ee2e6ddf1b9fea3c7",
-        "timestamp": "2026-09-29 09:59:36"
+        "checksum": "597e6aae251c2a78d5662996878224f8",
+        "timestamp": "2026-09-29 10:27:21"
       },
       {
         "version": "0.4.0.0",

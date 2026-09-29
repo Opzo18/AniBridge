@@ -67,8 +67,27 @@ public class RadarrClientTests
         Assert.Contains("\"monitored\":true", body);
         Assert.Contains("\"monitor\":\"movieOnly\"", body);
         Assert.Contains("\"searchForMovie\":false", body);
-        Assert.Contains("\"minimumAvailability\":\"announced\"", body);
+        Assert.Contains("\"minimumAvailability\":\"released\"", body);
         Assert.Contains("/movies", body);
+    }
+
+    [Fact]
+    public async Task AddAsync_PostsConfiguredMonitorAndAvailability()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json(LookupJson));
+        handler.Enqueue(Json("""{"id":7,"title":"Kimi no Na wa.","tmdbId":372058,"year":2016}"""));
+        var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:7878/api/v3/") };
+        var client = new RadarrClient(
+            http, NullLogger<RadarrClient>.Instance, 1, "/movies", "none", "announced");
+
+        await client.AddAsync(Media("Your Name"), AnimeStatus.Watching);
+
+        var body = handler.Bodies.Single(b => b.Length > 0);
+        Assert.Contains("\"monitor\":\"none\"", body);
+        Assert.Contains("\"minimumAvailability\":\"announced\"", body);
+        Assert.Contains("\"monitored\":true", body);
+        Assert.Contains("\"searchForMovie\":true", body);
     }
 
     [Fact]
@@ -83,17 +102,17 @@ public class RadarrClientTests
     }
 
     [Theory]
-    [InlineData(AnimeStatus.Watching, true, "movieOnly", true, "released")]
-    [InlineData(AnimeStatus.Planned, true, "movieOnly", false, "announced")]
-    [InlineData(AnimeStatus.OnHold, true, "none", false, "released")]
-    [InlineData(AnimeStatus.Completed, false, "none", false, "released")]
-    [InlineData(AnimeStatus.Dropped, false, "none", false, "released")]
-    public void MapMonitoring_MapsCorrectly(
-        AnimeStatus status, bool monitored, string monitor, bool search, string availability)
+    [InlineData(AnimeStatus.Watching, true, true)]
+    [InlineData(AnimeStatus.Planned, true, false)]
+    [InlineData(AnimeStatus.OnHold, true, false)]
+    [InlineData(AnimeStatus.Completed, false, false)]
+    [InlineData(AnimeStatus.Dropped, false, false)]
+    public void MapMonitorFlags_MapsCorrectly(
+        AnimeStatus status, bool monitored, bool search)
     {
         Assert.Equal(
-            (monitored, monitor, search, availability),
-            RadarrClient.MapMonitoring(status));
+            (monitored, search),
+            RadarrClient.MapMonitorFlags(status));
     }
 
     private sealed class QueueHandler : HttpMessageHandler

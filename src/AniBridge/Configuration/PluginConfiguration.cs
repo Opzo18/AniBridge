@@ -41,6 +41,21 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public string SonarrRootFolder { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Sonarr monitor mode for new series: all, future or none. Default all episodes.
+    /// </summary>
+    public string SonarrMonitor { get; set; } = "all";
+
+    /// <summary>
+    /// Sonarr series type for new series: anime, standard or daily. Default anime.
+    /// </summary>
+    public string SonarrSeriesType { get; set; } = "anime";
+
+    /// <summary>
+    /// Whether Sonarr creates a season folder for new series.
+    /// </summary>
+    public bool SonarrSeasonFolder { get; set; } = true;
+
     public bool RadarrEnabled { get; set; }
 
     /// <summary>
@@ -53,6 +68,16 @@ public class PluginConfiguration : BasePluginConfiguration
     public int RadarrQualityProfileId { get; set; } = 1;
 
     public string RadarrRootFolder { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Radarr monitor mode for new movies: movieOnly, movieAndCollection or none.
+    /// </summary>
+    public string RadarrMonitor { get; set; } = "movieOnly";
+
+    /// <summary>
+    /// Radarr minimum availability for new movies: announced, inCinemas or released.
+    /// </summary>
+    public string RadarrAvailability { get; set; } = "released";
 
     /// <summary>
     /// Which list statuses take part in sync (settings page in Stage 9).

@@ -94,16 +94,37 @@ public class SonarrClientTests
         Assert.Single(handler.Requests); // lookup only, no POST
     }
 
-    [Theory]
-    [InlineData(AnimeStatus.Watching, true, "all", true)]
-    [InlineData(AnimeStatus.Planned, true, "future", false)]
-    [InlineData(AnimeStatus.OnHold, true, "none", false)]
-    [InlineData(AnimeStatus.Completed, false, "none", false)]
-    [InlineData(AnimeStatus.Dropped, false, "none", false)]
-    public void MapMonitoring_MapsCorrectly(
-        AnimeStatus status, bool monitored, string monitor, bool search)
+    [Fact]
+    public async Task AddAsync_PostsConfiguredMonitorSeriesTypeSeasonFolder()
     {
-        Assert.Equal((monitored, monitor, search), SonarrClient.MapMonitoring(status));
+        var handler = new QueueHandler();
+        handler.Enqueue(Json(LookupJson)); // lookup
+        handler.Enqueue(Json("""{"id":5,"title":"Kimi no Na wa.","tvdbId":314095}""")); // POST ответ
+        var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:8989/api/v3/") };
+        var client = new SonarrClient(
+            http, NullLogger<SonarrClient>.Instance, 1, "/tv", "future", "standard", false);
+
+        await client.AddAsync(Media("Your Name"), AnimeStatus.Planned);
+
+        var body = handler.Bodies.Single(b => b.Length > 0);
+        Assert.Contains("\"monitor\":\"future\"", body);
+        Assert.Contains("\"monitorNewItems\":\"future\"", body);
+        Assert.Contains("\"seriesType\":\"standard\"", body);
+        Assert.Contains("\"seasonFolder\":false", body);
+        Assert.Contains("\"monitored\":true", body);
+        Assert.Contains("\"searchForMissingEpisodes\":false", body);
+    }
+
+    [Theory]
+    [InlineData(AnimeStatus.Watching, true, true)]
+    [InlineData(AnimeStatus.Planned, true, false)]
+    [InlineData(AnimeStatus.OnHold, true, false)]
+    [InlineData(AnimeStatus.Completed, false, false)]
+    [InlineData(AnimeStatus.Dropped, false, false)]
+    public void MapMonitorFlags_MapsCorrectly(
+        AnimeStatus status, bool monitored, bool search)
+    {
+        Assert.Equal((monitored, search), SonarrClient.MapMonitorFlags(status));
     }
 
     private sealed class QueueHandler : HttpMessageHandler

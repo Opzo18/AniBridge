@@ -270,60 +270,117 @@
             return true;
         }
 
+        function aniBridgeOutcomeColor(o) {
+            return { 0: '#27ae60', 1: '#2980b9', 4: '#16a085', 2: '#f39c12', 3: '#e74c3c', '-1': '#95a5a6' }[o] || '#7f8c8d';
+        }
+
+        function aniBridgeChip(text, bg) {
+            var s = document.createElement('span');
+            s.textContent = text;
+            s.style.cssText = 'background:' + bg + ';color:#fff;border-radius:0.8em;' +
+                'padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
+            return s;
+        }
+
+        function aniBridgeGroupByReason(items) {
+            var groups = [];
+            var map = {};
+            items.forEach(function (item) {
+                var key = (item.detail || '') + '\n' + (item.hint || '');
+                if (!map[key]) {
+                    map[key] = { detail: item.detail, hint: item.hint, items: [] };
+                    groups.push(map[key]);
+                }
+                map[key].items.push(item);
+            });
+            return groups;
+        }
+
+        function aniBridgeRow(item) {
+            var li = document.createElement('li');
+            li.style.marginBottom = '0.45em';
+            var top = document.createElement('div');
+            top.appendChild(aniBridgeChip(aniBridgeOutcomeName(item), aniBridgeOutcomeColor(item.outcome)));
+            top.appendChild(document.createTextNode(' '));
+            if (item.status) {
+                top.appendChild(aniBridgeChip(item.status, '#555'));
+                top.appendChild(document.createTextNode(' '));
+            }
+            var title = document.createElement('strong');
+            title.textContent = item.title;
+            top.appendChild(title);
+            li.appendChild(top);
+            var links = document.createElement('div');
+            links.style.cssText = 'font-size:0.85em;opacity:0.8;';
+            if (item.sourceUrl) {
+                var a1 = document.createElement('a');
+                a1.href = item.sourceUrl; a1.target = '_blank'; a1.rel = 'noopener';
+                a1.textContent = 'Shinden';
+                links.appendChild(a1);
+                links.appendChild(document.createTextNode(' · '));
+            }
+            if (item.aniListUrl) {
+                var a2 = document.createElement('a');
+                a2.href = item.aniListUrl; a2.target = '_blank'; a2.rel = 'noopener';
+                a2.textContent = 'AniList';
+                links.appendChild(a2);
+                links.appendChild(document.createTextNode(' · '));
+            }
+            var copy = document.createElement('a');
+            copy.href = '#'; copy.textContent = 'Copy title';
+            copy.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (navigator.clipboard) { navigator.clipboard.writeText(item.title); }
+            });
+            links.appendChild(copy);
+            li.appendChild(links);
+            return li;
+        }
+
+        function aniBridgeReasonBanner(ul, detail, hint, count, showCount) {
+            var li = document.createElement('li');
+            li.style.cssText = 'list-style:none;margin:0.4em 0 0.3em;padding:0.35em 0.6em;' +
+                'background:rgba(127,140,141,0.15);border-radius:0.4em;';
+            var head = document.createElement('div');
+            head.style.fontWeight = 'bold';
+            head.textContent = (detail || 'No details') + (showCount ? ' (' + count + ')' : '');
+            li.appendChild(head);
+            if (hint) {
+                var h = document.createElement('div');
+                h.style.opacity = '0.85';
+                h.textContent = '💡 ' + hint;
+                li.appendChild(h);
+            }
+            ul.appendChild(li);
+        }
+
         function aniBridgeFillList(id, items, limit, emptyText) {
             var ul = document.querySelector('#' + id);
             ul.innerHTML = '';
-            var shown = items.slice(0, limit);
-            shown.forEach(function (item) {
-                var li = document.createElement('li');
-                                li.style.marginBottom = '0.3em';
-                var title = document.createElement('strong');
-                title.textContent = item.title + (item.status ? ' (' + item.status + ')' : '') +
-                    ' [' + aniBridgeOutcomeName(item) + ']';
-                li.appendChild(title);
-                var meta = [];
-                if (item.detail) { meta.push(item.detail); }
-                if (item.hint) { meta.push('💡 ' + item.hint); }
-                if (meta.length) {
-                    var d = document.createElement('div');
-                    d.textContent = meta.join(' — ');
-                    d.style.opacity = '0.85';
-                    li.appendChild(d);
-                }
-                var links = document.createElement('div');
-                if (item.sourceUrl) {
-                    var a1 = document.createElement('a');
-                    a1.href = item.sourceUrl; a1.target = '_blank'; a1.rel = 'noopener';
-                    a1.textContent = 'Shinden';
-                    links.appendChild(a1);
-                    links.appendChild(document.createTextNode(' · '));
-                }
-                if (item.aniListUrl) {
-                    var a2 = document.createElement('a');
-                    a2.href = item.aniListUrl; a2.target = '_blank'; a2.rel = 'noopener';
-                    a2.textContent = 'AniList';
-                    links.appendChild(a2);
-                    links.appendChild(document.createTextNode(' · '));
-                }
-                var copy = document.createElement('a');
-                copy.href = '#'; copy.textContent = 'Copy title';
-                copy.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    if (navigator.clipboard) { navigator.clipboard.writeText(item.title); }
-                });
-                links.appendChild(copy);
-                li.appendChild(links);
-                ul.appendChild(li);
-            });
-            if (items.length > shown.length) {
-                var more = document.createElement('li');
-                more.textContent = '…and ' + (items.length - shown.length) + ' more (use search to narrow down)';
-                ul.appendChild(more);
-            }
             if (items.length === 0) {
                 var none = document.createElement('li');
                 none.textContent = emptyText || '—';
                 ul.appendChild(none);
+                return;
+            }
+            var groups = aniBridgeGroupByReason(items);
+            var shown = 0;
+            var done = false;
+            groups.forEach(function (g) {
+                if (done) { return; }
+                if (groups.length > 1 || g.detail || g.hint) {
+                    aniBridgeReasonBanner(ul, g.detail, g.hint, g.items.length, groups.length > 1);
+                }
+                g.items.forEach(function (item) {
+                    if (shown >= limit) { done = true; return; }
+                    shown++;
+                    ul.appendChild(aniBridgeRow(item));
+                });
+            });
+            if (items.length > shown) {
+                var more = document.createElement('li');
+                more.textContent = '…and ' + (items.length - shown) + ' more (use search to narrow down)';
+                ul.appendChild(more);
             }
         }
 

@@ -10,17 +10,18 @@
             </div>
             <h3 class="sectionTitle">AniBridge setup</h3>
             <div class="fieldDescription">Flow: Shinden → AniBridge → AniList → Sonarr/Radarr → Jellyfin. Nothing is ever deleted.</div>
-            <div id="AniBridgeOvBanner" class="fieldDescription" style="font-weight:bold;"></div>
-            <div id="AniBridgeOvChecklist" class="fieldDescription">Loading…</div>
-            <div id="AniBridgeOvHint" class="fieldDescription"></div>
-            <div style="display:flex;gap:0.5em;flex-wrap:wrap;margin:1em 0;">
-                <button is="emby-button" type="button" class="raised emby-button" onclick="aniBridgeNav('AniBridge Shinden');return false;"><span>1 · Shinden</span></button>
-                <button is="emby-button" type="button" class="raised emby-button" onclick="aniBridgeNav('AniBridge Sonarr');return false;"><span>2 · Sonarr</span></button>
-                <button is="emby-button" type="button" class="raised emby-button" onclick="aniBridgeNav('AniBridge Radarr');return false;"><span>3 · Radarr</span></button>
-            </div>
+            <div id="AniBridgeOvBanner" style="margin:0.5em 0;"></div>
+            <div id="AniBridgeOvCards" style="display:flex;gap:0.5em;flex-wrap:wrap;margin:0.5em 0;"></div>
+            <div class="fieldDescription" id="AniBridgeOvHint"></div>
             <h3 class="sectionTitle">Last sync</h3>
+            <div id="AniBridgeOvBadges" style="display:flex;gap:0.4em;flex-wrap:wrap;margin:0.5em 0;"></div>
             <div class="fieldDescription" id="AniBridgeOvLastSync">Loading…</div>
-            <div class="fieldDescription">Details live on the Shinden page (search, filters, per-title hints).</div>
+            <div>
+                <button is="emby-button" type="button" class="raised emby-button"
+                    onclick="aniBridgeNav('AniBridge Shinden');return false;">
+                    <span>Open Shinden details</span>
+                </button>
+            </div>
         </div>
     </div>
     <script type="text/javascript">
@@ -32,20 +33,47 @@
             }
             window.aniBridgeNav = nav;
 
-            function tick(ok) { return ok ? '✓' : '✗'; }
-
             // Server serializes PascalCase (Jellyfin default); accept both casings.
             function abPick(o, camel, pascal) {
                 if (!o) { return undefined; }
                 return o[camel] !== undefined ? o[camel] : o[pascal];
             }
 
+            function abChip(text, bg) {
+                var s = document.createElement('span');
+                s.textContent = text;
+                s.style.cssText = 'background:' + bg + ';color:#fff;border-radius:0.8em;' +
+                    'padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
+                return s;
+            }
+
+            function abCard(step, name, page, ok, detail) {
+                var card = document.createElement('div');
+                card.style.cssText = 'flex:1;min-width:9em;max-width:16em;cursor:pointer;' +
+                    'padding:0.6em 0.8em;border-radius:0.5em;background:rgba(127,140,141,0.15);' +
+                    'border-left:0.3em solid ' + (ok ? '#27ae60' : '#e74c3c') + ';';
+                var top = document.createElement('div');
+                top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:0.4em;';
+                var title = document.createElement('strong');
+                title.textContent = step + ' · ' + name;
+                top.appendChild(title);
+                top.appendChild(abChip(ok ? '✓' : '✗', ok ? '#27ae60' : '#e74c3c'));
+                card.appendChild(top);
+                var sub = document.createElement('div');
+                sub.style.cssText = 'font-size:0.85em;opacity:0.85;margin-top:0.25em;';
+                sub.textContent = ok ? 'Configured.' : (detail || 'Not configured.');
+                card.appendChild(sub);
+                card.addEventListener('click', function () { nav(page); });
+                return card;
+            }
+
             document.querySelector('#AniBridgeOverviewPage').addEventListener('pageshow', function () {
-                var list = document.querySelector('#AniBridgeOvChecklist');
-                var hint = document.querySelector('#AniBridgeOvHint');
+                var cards = document.querySelector('#AniBridgeOvCards');
+                var hintEl = document.querySelector('#AniBridgeOvHint');
                 var banner = document.querySelector('#AniBridgeOvBanner');
                 var last = document.querySelector('#AniBridgeOvLastSync');
-                list.textContent = 'Loading…';
+                var badges = document.querySelector('#AniBridgeOvBadges');
+                cards.innerHTML = '<div class="fieldDescription">Loading…</div>';
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                     .then(function (s) {
                         s = s || {};
@@ -53,34 +81,53 @@
                         var sonarrOk = !!abPick(s, 'sonarrOk', 'SonarrOk');
                         var radarrOk = !!abPick(s, 'radarrOk', 'RadarrOk');
                         var dryRun = !!abPick(s, 'dryRun', 'DryRun');
-                        var hint = abPick(s, 'hint', 'Hint');
-                        list.textContent = 'Shinden ' + tick(shindenOk) + '  ·  Sonarr ' + tick(sonarrOk) +
-                            '  ·  Radarr ' + tick(radarrOk);
-                        hint.textContent = hint || '';
-                        banner.textContent = dryRun
-                            ? 'DRY RUN is ON — nothing is added to Sonarr/Radarr yet.'
-                            : 'LIVE mode — sync adds to Sonarr/Radarr.';
+                        cards.innerHTML = '';
+                        cards.appendChild(abCard('1', 'Shinden', 'AniBridge Shinden', shindenOk,
+                            abPick(s, 'shindenDetail', 'ShindenDetail')));
+                        cards.appendChild(abCard('2', 'Sonarr', 'AniBridge Sonarr', sonarrOk,
+                            abPick(s, 'sonarrDetail', 'SonarrDetail')));
+                        cards.appendChild(abCard('3', 'Radarr', 'AniBridge Radarr', radarrOk,
+                            abPick(s, 'radarrDetail', 'RadarrDetail')));
+                        hintEl.textContent = abPick(s, 'hint', 'Hint') || '';
+                        banner.innerHTML = '';
+                        banner.appendChild(abChip(
+                            dryRun ? 'DRY RUN — nothing is added yet' : 'LIVE — sync adds to Sonarr/Radarr',
+                            dryRun ? '#f39c12' : '#27ae60'));
                     }, function () {
-                        list.textContent = 'Could not load status.';
+                        cards.innerHTML = '<div class="fieldDescription">Could not load status.</div>';
                     });
                 last.textContent = 'Loading…';
+                badges.innerHTML = '';
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/last-sync'), dataType: 'json' })
                     .then(function (report) {
                         report = report || {};
+                        var finishedAt = abPick(report, 'finishedAt', 'FinishedAt');
+                        if (!finishedAt) {
+                            last.textContent = 'No sync has run yet.';
+                            return;
+                        }
                         var r = abPick(report, 'result', 'Result') || {};
                         function c(camel, pascal) {
                             var v = abPick(r, camel, pascal);
                             return v === undefined || v === null ? 0 : v;
                         }
-                        var when = abPick(report, 'finishedAt', 'FinishedAt');
-                        when = when ? new Date(when).toLocaleString() : 'no sync yet';
+                        var defs = [
+                            ['Scanned', c('scanned', 'Scanned'), '#7f8c8d'],
+                            ['Added', c('added', 'Added'), '#27ae60'],
+                            ['WouldAdd', c('wouldAdd', 'WouldAdd'), '#16a085'],
+                            ['Skipped', c('skipped', 'Skipped'), '#f39c12'],
+                            ['Failed', c('failed', 'Failed'), '#e74c3c']
+                        ];
+                        defs.forEach(function (d) {
+                            badges.appendChild(abChip(d[0] + ': ' + d[1], d[2]));
+                        });
                         var dryRun = !!abPick(report, 'dryRun', 'DryRun');
                         var error = abPick(report, 'error', 'Error');
                         var inProgress = !!abPick(report, 'inProgress', 'InProgress');
                         var scope = abPick(report, 'scope', 'Scope');
-                        var parts = ['Scanned', 'Added', 'AlreadyExists', 'Skipped', 'Failed', 'WouldAdd']
-                            .map(function (k) { return k + ': ' + c(k.charAt(0).toLowerCase() + k.slice(1), k); });
-                        last.textContent = (dryRun ? '(dry run) ' : '') + (inProgress ? 'Running… ' : 'Finished ') + when + ' — ' + parts.join(' · ') +
+                        last.textContent = (dryRun ? '(dry run) ' : '') +
+                            (inProgress ? 'Running… ' : 'Finished ') +
+                            new Date(finishedAt).toLocaleString() +
                             (scope ? ' — scope: ' + scope : '') +
                             (error ? ' — FAILED: ' + error : '');
                     }, function () {

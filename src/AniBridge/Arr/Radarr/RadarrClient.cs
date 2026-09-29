@@ -23,14 +23,23 @@ public sealed class RadarrClient : IArrClient
     private readonly ILogger<RadarrClient> _logger;
     private readonly int _qualityProfileId;
     private readonly string _rootFolderPath;
+    private readonly string _monitor;
+    private readonly string _availability;
 
     public RadarrClient(
-        HttpClient http, ILogger<RadarrClient> logger, int qualityProfileId, string rootFolderPath)
+        HttpClient http,
+        ILogger<RadarrClient> logger,
+        int qualityProfileId,
+        string rootFolderPath,
+        string monitor = "movieOnly",
+        string availability = "released")
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _qualityProfileId = qualityProfileId;
         _rootFolderPath = rootFolderPath ?? throw new ArgumentNullException(nameof(rootFolderPath));
+        _monitor = string.IsNullOrWhiteSpace(monitor) ? "movieOnly" : monitor.Trim();
+        _availability = string.IsNullOrWhiteSpace(availability) ? "released" : availability.Trim();
     }
 
     public string Name => ClientName;
@@ -39,7 +48,13 @@ public sealed class RadarrClient : IArrClient
     /// Production factory: BaseAddress from configuration + X-Api-Key header.
     /// </summary>
     public static RadarrClient CreateDefault(
-        ILogger<RadarrClient> logger, string baseUrl, string apiKey, int qualityProfileId, string rootFolderPath)
+        ILogger<RadarrClient> logger,
+        string baseUrl,
+        string apiKey,
+        int qualityProfileId,
+        string rootFolderPath,
+        string monitor = "movieOnly",
+        string availability = "released")
     {
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
         {
@@ -49,7 +64,7 @@ public sealed class RadarrClient : IArrClient
         var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/api/v3/") };
         http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
         http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return new RadarrClient(http, logger, qualityProfileId, rootFolderPath);
+        return new RadarrClient(http, logger, qualityProfileId, rootFolderPath, monitor, availability);
     }
 
     public async Task<bool> ExistsAsync(ResolvedMedia media, CancellationToken cancellationToken = default)
@@ -73,7 +88,7 @@ public sealed class RadarrClient : IArrClient
             return;
         }
 
-        var (monitored, monitor, search, availability) = MapMonitoring(status);
+        var (monitored, search) = MapMonitorFlags(status);
         var payload = new RadarrNewMovie
         {
             Title = movie.Title ?? media.Title,
@@ -82,10 +97,10 @@ public sealed class RadarrClient : IArrClient
             QualityProfileId = _qualityProfileId,
             RootFolderPath = _rootFolderPath,
             Monitored = monitored,
-            MinimumAvailability = availability,
+            MinimumAvailability = _availability,
             AddOptions = new RadarrAddOptions
             {
-                Monitor = monitor,
+                Monitor = _monitor,
                 SearchForMovie = search,
             },
         };
@@ -95,18 +110,22 @@ public sealed class RadarrClient : IArrClient
         resp.EnsureSuccessStatusCode();
         _logger.LogInformation(
             "Radarr: added {Title} (tmdb {TmdbId}, monitor {Monitor}).",
-            payload.Title, payload.TmdbId, monitor);
+            payload.Title, payload.TmdbId, _monitor);
     }
 
-    public static (bool Monitored, string Monitor, bool Search, string Availability) MapMonitoring(
-        AnimeStatus status) => status switch
+    /// <summary>
+    /// Maps user status to monitoring flags. Monitor mode and minimum availability
+    /// come from configuration (RadarrMonitor/RadarrAvailability);
+    /// Watching searches for the movie immediately.
+    /// </summary>
+    public static (bool Monitored, bool Search) MapMonitorFlags(AnimeStatus status) => status switch
         {
-            AnimeStatus.Watching => (true, "movieOnly", true, "released"),
-            AnimeStatus.Planned => (true, "movieOnly", false, "announced"),
-            AnimeStatus.OnHold => (true, "none", false, "released"),
-            AnimeStatus.Completed => (false, "none", false, "released"),
-            AnimeStatus.Dropped => (false, "none", false, "released"),
-            _ => (false, "none", false, "released"),
+            AnimeStatus.Watching => (true, true),
+            AnimeStatus.Planned => (true, false),
+            AnimeStatus.OnHold => (true, false),
+            AnimeStatus.Completed => (false, false),
+            AnimeStatus.Dropped => (false, false),
+            _ => (false, false),
         };
 
     private async Task<RadarrMovie?> LookupExactAsync(string title, CancellationToken cancellationToken)

@@ -8,7 +8,7 @@
                 <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
             </div>
-            <div class="fieldDescription" id="AniBridgeSonarrChecklist"></div>
+            <div id="AniBridgeSonarrChips" style="display:flex;gap:0.4em;flex-wrap:wrap;margin-bottom:0.5em;"></div>
             <form id="AniBridgeSonarrForm">
                 <h3 class="sectionTitle">Sonarr (TV shows)</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -27,12 +27,6 @@
                     <input id="SonarrApiKey" type="password" is="emby-input" autocomplete="off" />
                     <div class="fieldDescription">Settings → General → Security in Sonarr. <a href="#" id="SonarrShowKey">Show</a></div>
                 </div>
-                <div>
-                    <button id="SonarrTestBtn" is="emby-button" type="button" class="raised block emby-button">
-                        <span>Test &amp; reload lists</span>
-                    </button>
-                </div>
-                <div class="fieldDescription" id="AniBridgeSonarrTest"></div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="SonarrQualityProfileId">Quality profile</label>
                     <select is="emby-select" id="SonarrQualityProfileId" class="emby-select"></select>
@@ -40,11 +34,39 @@
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="SonarrRootFolder">Root folder</label>
                     <select is="emby-select" id="SonarrRootFolder" class="emby-select"></select>
+                    <div class="fieldDescription">Sonarr requires a root folder for every added series — pick where anime lands. With a single folder, Test selects it automatically.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="SonarrMonitor">Monitor (new series)</label>
+                    <select is="emby-select" id="SonarrMonitor" class="emby-select">
+                        <option value="all">All episodes</option>
+                        <option value="future">Future episodes</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="SonarrSeriesType">Series type</label>
+                    <select is="emby-select" id="SonarrSeriesType" class="emby-select">
+                        <option value="anime">Anime (absolute numbers)</option>
+                        <option value="standard">Standard (S01E05)</option>
+                        <option value="daily">Daily (dates)</option>
+                    </select>
+                    <div class="fieldDescription">Anime type fits most anime numbering; Standard matches classic TV.</div>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="SonarrSeasonFolder" />
+                        <span>Season folder</span>
+                    </label>
                 </div>
                 <div class="fieldDescription" id="AniBridgeSonarrWarn"></div>
+                <div class="fieldDescription" id="AniBridgeSonarrTest"></div>
 
-                <div>
-                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap;">
+                    <button id="SonarrTestBtn" is="emby-button" type="button" class="raised emby-button" style="flex:1;min-width:10em;">
+                        <span>Test &amp; reload lists</span>
+                    </button>
+                    <button is="emby-button" type="submit" class="raised button-submit emby-button" style="flex:1;min-width:10em;">
                         <span>Save</span>
                     </button>
                 </div>
@@ -85,15 +107,63 @@
             };
         }
 
-        function aniBridgeFillSelect(id, items, current) {
+        function abChip(text, bg) {
+            var s = document.createElement('span');
+            s.textContent = text;
+            s.style.cssText = 'background:' + bg + ';color:#fff;border-radius:0.8em;' +
+                'padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
+            return s;
+        }
+
+        function renderSonarrChips(s) {
+            var box = document.querySelector('#AniBridgeSonarrChips');
+            box.innerHTML = '';
+            [['Shinden', s.shindenOk], ['Sonarr', s.sonarrOk], ['Radarr', s.radarrOk]].forEach(function (c) {
+                box.appendChild(abChip(c[0] + ' ' + (c[1] ? '✓' : '✗'), c[1] ? '#27ae60' : '#e74c3c'));
+            });
+            box.appendChild(abChip(s.dryRun ? 'DRY RUN' : 'LIVE', s.dryRun ? '#f39c12' : '#27ae60'));
+        }
+
+        function sonarrFormState() {
+            return {
+                enabled: document.querySelector('#SonarrEnabled').checked,
+                url: document.querySelector('#SonarrUrl').value.trim(),
+                key: document.querySelector('#SonarrApiKey').value.trim()
+            };
+        }
+
+        function renderSonarrStatus() {
+            var el = document.querySelector('#AniBridgeSonarrTest');
+            if (AniBridgeSonarr.test) {
+                el.style.color = AniBridgeSonarr.test.ok ? '#2ecc71' : '#e74c3c';
+                el.textContent = AniBridgeSonarr.test.msg;
+                return;
+            }
+            var snap = AniBridgeSonarr.snapshot;
+            var cur = sonarrFormState();
+            el.style.color = '';
+            if (snap && (cur.enabled !== snap.enabled || cur.url !== snap.url || cur.key !== snap.key)) {
+                el.textContent = 'Unsaved changes — Test or Save.';
+            } else {
+                el.textContent = '';
+            }
+        }
+
+        function aniBridgeFillSelect(id, items, current, loaded) {
             var sel = document.querySelector('#' + id);
             sel.innerHTML = '';
-            var values = items.slice();
-            if (current && !values.some(function (v) { return v.value === current; })) {
-                values.unshift({ value: current, text: current + ' (saved)' });
-            }
-            if (values.length === 0) {
-                values.unshift({ value: '', text: '— Test the connection first —' });
+            var values;
+            if (!loaded) {
+                // Lists not loaded: keep the saved value submittable, but say so.
+                values = [{ value: current || '', text: '— Test the connection first —' }];
+            } else {
+                values = items.slice();
+                if (current && !values.some(function (v) { return v.value === current; })) {
+                    values.unshift({ value: current, text: current + ' (saved)' });
+                }
+                if (values.length === 0) {
+                    values.unshift({ value: '', text: '— No entries found —' });
+                }
             }
             values.forEach(function (v) {
                 var o = document.createElement('option');
@@ -104,51 +174,90 @@
             if (current) { sel.value = current; }
         }
 
+        function sonarrProfileOptions(data) {
+            return (data.qualityProfiles || []).map(function (p) {
+                return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') };
+            });
+        }
+
+        function sonarrFolderOptions(data) {
+            return (data.rootFolders || []).map(function (f) { return { value: f, text: f }; });
+        }
+
+        function sonarrAutoSingle(id, options) {
+            // One option means no real choice — select it so Save just works.
+            if (options.length === 1) {
+                document.querySelector('#' + id).value = options[0].value;
+            }
+        }
+
         function aniBridgeIsHttpUrl(s) {
             return /^https?:\/\/.+/.test((s || '').trim());
         }
 
-        function aniBridgeSonarrLoadOptions(url, key, savedProfile, savedFolder, testMsgEl) {
-            var warn = document.querySelector('#AniBridgeSonarrWarn');
-            return ApiClient.ajax({
+        function aniBridgeSonarrTestNow() {
+            var url = document.querySelector('#SonarrUrl').value;
+            var key = document.querySelector('#SonarrApiKey').value;
+            var urlErr = document.querySelector('#SonarrUrlError');
+            urlErr.textContent = aniBridgeIsHttpUrl(url) ? '' : 'URL should look like http://192.168.33.20:8989';
+            if (!aniBridgeIsHttpUrl(url) || !key.trim()) {
+                AniBridgeSonarr.test = { ok: false, msg: 'Enter URL and API key first, then Test.' };
+                renderSonarrStatus();
+                return;
+            }
+            AniBridgeSonarr.test = null;
+            var el = document.querySelector('#AniBridgeSonarrTest');
+            el.style.color = '';
+            el.textContent = 'Testing…';
+            ApiClient.ajax({
                 type: 'POST',
                 url: ApiClient.getUrl('AniBridge/sonarr/test'),
-                data: JSON.stringify({ url: url, apiKey: key }),
+                data: JSON.stringify({ url: url.trim(), apiKey: key.trim() }),
                 contentType: 'application/json',
                 dataType: 'json'
             }).then(function (data) {
                 data = abNormArr(data);
-                aniBridgeFillSelect('SonarrQualityProfileId',
-                    (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
-                    savedProfile);
-                aniBridgeFillSelect('SonarrRootFolder',
-                    (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
-                    savedFolder);
-                warn.textContent = data.error || '';
-                if (testMsgEl) { testMsgEl.textContent = data.error ? ('Test: ' + data.error) : 'Test OK — lists loaded.'; }
+                var curProfile = document.querySelector('#SonarrQualityProfileId').value;
+                var curFolder = document.querySelector('#SonarrRootFolder').value;
+                var profiles = sonarrProfileOptions(data);
+                var folders = sonarrFolderOptions(data);
+                aniBridgeFillSelect('SonarrQualityProfileId', profiles, curProfile, !data.error);
+                aniBridgeFillSelect('SonarrRootFolder', folders, curFolder, !data.error);
+                if (!data.error) {
+                    sonarrAutoSingle('SonarrQualityProfileId', profiles);
+                    sonarrAutoSingle('SonarrRootFolder', folders);
+                }
+                document.querySelector('#AniBridgeSonarrWarn').textContent = data.error || '';
+                AniBridgeSonarr.test = data.error
+                    ? { ok: false, msg: 'Test: ' + data.error }
+                    : { ok: true, msg: '✓ Connected — ' + data.qualityProfiles.length +
+                        ' profiles, ' + data.rootFolders.length + ' folders.' };
+                renderSonarrStatus();
             }, function () {
-                warn.textContent = 'Could not reach AniBridge test endpoint.';
-                if (testMsgEl) { testMsgEl.textContent = 'Test failed to run.'; }
+                AniBridgeSonarr.test = { ok: false, msg: 'Test failed to run.' };
+                renderSonarrStatus();
             });
         }
 
         document.querySelector('#AniBridgeSonarrPage').addEventListener('pageshow', function () {
             Dashboard.showLoadingMsg();
+            AniBridgeSonarr.test = null;
             ApiClient.getPluginConfiguration(AniBridgeSonarr.pluginId).then(function (config) {
                 document.querySelector('#SonarrEnabled').checked = config.SonarrEnabled;
                 document.querySelector('#SonarrUrl').value = config.SonarrUrl || '';
                 document.querySelector('#SonarrApiKey').value = config.SonarrApiKey || '';
+                document.querySelector('#SonarrMonitor').value = config.SonarrMonitor || 'all';
+                document.querySelector('#SonarrSeriesType').value = config.SonarrSeriesType || 'anime';
+                document.querySelector('#SonarrSeasonFolder').checked = config.SonarrSeasonFolder !== false;
                 var savedProfile = String(config.SonarrQualityProfileId || 1);
                 var savedFolder = config.SonarrRootFolder || '';
-                aniBridgeFillSelect('SonarrQualityProfileId', [], savedProfile);
-                aniBridgeFillSelect('SonarrRootFolder', [], savedFolder);
+                AniBridgeSonarr.snapshot = sonarrFormState();
+                aniBridgeFillSelect('SonarrQualityProfileId', [], savedProfile, false);
+                aniBridgeFillSelect('SonarrRootFolder', [], savedFolder, false);
+                renderSonarrStatus();
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                     .then(function (s) {
-                        s = abNormStatus(s);
-                        var el = document.querySelector('#AniBridgeSonarrChecklist');
-                        el.textContent = 'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' +
-                            (s.sonarrOk ? '✓' : '✗') + '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗') +
-                            (s.dryRun ? '  ·  DRY RUN' : '  ·  LIVE');
+                        renderSonarrChips(abNormStatus(s));
                     }, function () { });
                 // Load lists from saved settings (no test message on open).
                 ApiClient.ajax({
@@ -157,12 +266,14 @@
                     dataType: 'json'
                 }).then(function (data) {
                     data = abNormArr(data);
-                    aniBridgeFillSelect('SonarrQualityProfileId',
-                        (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
-                        savedProfile);
-                    aniBridgeFillSelect('SonarrRootFolder',
-                        (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
-                        savedFolder);
+                    var profiles = sonarrProfileOptions(data);
+                    var folders = sonarrFolderOptions(data);
+                    aniBridgeFillSelect('SonarrQualityProfileId', profiles, savedProfile, !data.error);
+                    aniBridgeFillSelect('SonarrRootFolder', folders, savedFolder, !data.error);
+                    if (!data.error) {
+                        sonarrAutoSingle('SonarrQualityProfileId', profiles);
+                        sonarrAutoSingle('SonarrRootFolder', folders);
+                    }
                     document.querySelector('#AniBridgeSonarrWarn').textContent = data.error || '';
                     Dashboard.hideLoadingMsg();
                 }, function () {
@@ -173,21 +284,18 @@
             });
         });
 
-        document.querySelector('#SonarrTestBtn').addEventListener('click', function () {
-            var url = document.querySelector('#SonarrUrl').value;
-            var key = document.querySelector('#SonarrApiKey').value;
-            var urlErr = document.querySelector('#SonarrUrlError');
-            urlErr.textContent = aniBridgeIsHttpUrl(url) ? '' : 'URL should look like http://192.168.33.20:8989';
-            if (!aniBridgeIsHttpUrl(url) || !key.trim()) {
-                document.querySelector('#AniBridgeSonarrTest').textContent = 'Enter URL and API key first.';
-                return;
-            }
-            var msg = document.querySelector('#AniBridgeSonarrTest');
-            msg.textContent = 'Testing…';
-            aniBridgeSonarrLoadOptions(url.trim(), key.trim(),
-                document.querySelector('#SonarrQualityProfileId').value,
-                document.querySelector('#SonarrRootFolder').value, msg);
+        ['SonarrEnabled', 'SonarrUrl', 'SonarrApiKey'].forEach(function (id) {
+            document.querySelector('#' + id).addEventListener('input', function () {
+                AniBridgeSonarr.test = null;
+                renderSonarrStatus();
+            });
+            document.querySelector('#' + id).addEventListener('change', function () {
+                AniBridgeSonarr.test = null;
+                renderSonarrStatus();
+            });
         });
+
+        document.querySelector('#SonarrTestBtn').addEventListener('click', aniBridgeSonarrTestNow);
 
         document.querySelector('#SonarrShowKey').addEventListener('click', function (e) {
             e.preventDefault();
@@ -210,8 +318,18 @@
                 config.SonarrApiKey = document.querySelector('#SonarrApiKey').value.trim();
                 config.SonarrQualityProfileId = parseInt(document.querySelector('#SonarrQualityProfileId').value, 10) || 1;
                 config.SonarrRootFolder = document.querySelector('#SonarrRootFolder').value;
+                config.SonarrMonitor = document.querySelector('#SonarrMonitor').value || 'all';
+                config.SonarrSeriesType = document.querySelector('#SonarrSeriesType').value || 'anime';
+                config.SonarrSeasonFolder = document.querySelector('#SonarrSeasonFolder').checked;
                 ApiClient.updatePluginConfiguration(AniBridgeSonarr.pluginId, config).then(function (result) {
                     Dashboard.processPluginConfigurationUpdateResult(result);
+                    AniBridgeSonarr.snapshot = sonarrFormState();
+                    AniBridgeSonarr.test = null;
+                    renderSonarrStatus();
+                    ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
+                        .then(function (s) {
+                            renderSonarrChips(abNormStatus(s));
+                        }, function () { });
                 });
             });
             return false;

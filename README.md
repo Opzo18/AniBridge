@@ -11,7 +11,7 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 Version **0.4.1** live: smarter AniList matching — synonyms plus retry
 queries from Shinden alternate titles (exact matches only, never guessed). ✅
-(`dotnet test`: 107/107 passed)
+(`dotnet test`: 113/113 passed)
 
 ## Requirements
 

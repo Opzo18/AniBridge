@@ -8,7 +8,7 @@
                 <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
                 <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
             </div>
-            <div class="fieldDescription" id="AniBridgeRadarrChecklist"></div>
+            <div id="AniBridgeRadarrChips" style="display:flex;gap:0.4em;flex-wrap:wrap;margin-bottom:0.5em;"></div>
             <form id="AniBridgeRadarrForm">
                 <h3 class="sectionTitle">Radarr (movies)</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -27,12 +27,6 @@
                     <input id="RadarrApiKey" type="password" is="emby-input" autocomplete="off" />
                     <div class="fieldDescription">Settings → General → Security in Radarr. <a href="#" id="RadarrShowKey">Show</a></div>
                 </div>
-                <div>
-                    <button id="RadarrTestBtn" is="emby-button" type="button" class="raised block emby-button">
-                        <span>Test &amp; reload lists</span>
-                    </button>
-                </div>
-                <div class="fieldDescription" id="AniBridgeRadarrTest"></div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="RadarrQualityProfileId">Quality profile</label>
                     <select is="emby-select" id="RadarrQualityProfileId" class="emby-select"></select>
@@ -40,11 +34,32 @@
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="RadarrRootFolder">Root folder</label>
                     <select is="emby-select" id="RadarrRootFolder" class="emby-select"></select>
+                    <div class="fieldDescription">Radarr requires a root folder for every added movie — pick where anime lands. With a single folder, Test selects it automatically.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="RadarrMonitor">Monitor (new movies)</label>
+                    <select is="emby-select" id="RadarrMonitor" class="emby-select">
+                        <option value="movieOnly">Movie only</option>
+                        <option value="movieAndCollection">Movie and collection</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="RadarrAvailability">Minimum availability</label>
+                    <select is="emby-select" id="RadarrAvailability" class="emby-select">
+                        <option value="announced">Announced</option>
+                        <option value="inCinemas">In cinemas</option>
+                        <option value="released">Released</option>
+                    </select>
                 </div>
                 <div class="fieldDescription" id="AniBridgeRadarrWarn"></div>
+                <div class="fieldDescription" id="AniBridgeRadarrTest"></div>
 
-                <div>
-                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap;">
+                    <button id="RadarrTestBtn" is="emby-button" type="button" class="raised emby-button" style="flex:1;min-width:10em;">
+                        <span>Test &amp; reload lists</span>
+                    </button>
+                    <button is="emby-button" type="submit" class="raised button-submit emby-button" style="flex:1;min-width:10em;">
                         <span>Save</span>
                     </button>
                 </div>
@@ -75,15 +90,66 @@
             };
         }
 
-        function aniBridgeFillSelectRadarr(id, items, current) {
+        function abChipRadarr(text, bg) {
+            var s = document.createElement('span');
+            s.textContent = text;
+            s.style.cssText = 'background:' + bg + ';color:#fff;border-radius:0.8em;' +
+                'padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
+            return s;
+        }
+
+        function renderRadarrChips(s) {
+            s = s || {};
+            var box = document.querySelector('#AniBridgeRadarrChips');
+            box.innerHTML = '';
+            [['Shinden', !!abPick(s, 'shindenOk', 'ShindenOk')],
+             ['Sonarr', !!abPick(s, 'sonarrOk', 'SonarrOk')],
+             ['Radarr', !!abPick(s, 'radarrOk', 'RadarrOk')]].forEach(function (c) {
+                box.appendChild(abChipRadarr(c[0] + ' ' + (c[1] ? '✓' : '✗'), c[1] ? '#27ae60' : '#e74c3c'));
+            });
+            var dryRun = !!abPick(s, 'dryRun', 'DryRun');
+            box.appendChild(abChipRadarr(dryRun ? 'DRY RUN' : 'LIVE', dryRun ? '#f39c12' : '#27ae60'));
+        }
+
+        function radarrFormState() {
+            return {
+                enabled: document.querySelector('#RadarrEnabled').checked,
+                url: document.querySelector('#RadarrUrl').value.trim(),
+                key: document.querySelector('#RadarrApiKey').value.trim()
+            };
+        }
+
+        function renderRadarrStatus() {
+            var el = document.querySelector('#AniBridgeRadarrTest');
+            if (AniBridgeRadarr.test) {
+                el.style.color = AniBridgeRadarr.test.ok ? '#2ecc71' : '#e74c3c';
+                el.textContent = AniBridgeRadarr.test.msg;
+                return;
+            }
+            var snap = AniBridgeRadarr.snapshot;
+            var cur = radarrFormState();
+            el.style.color = '';
+            if (snap && (cur.enabled !== snap.enabled || cur.url !== snap.url || cur.key !== snap.key)) {
+                el.textContent = 'Unsaved changes — Test or Save.';
+            } else {
+                el.textContent = '';
+            }
+        }
+
+        function aniBridgeFillSelectRadarr(id, items, current, loaded) {
             var sel = document.querySelector('#' + id);
             sel.innerHTML = '';
-            var values = items.slice();
-            if (current && !values.some(function (v) { return v.value === current; })) {
-                values.unshift({ value: current, text: current + ' (saved)' });
-            }
-            if (values.length === 0) {
-                values.unshift({ value: '', text: '— Test the connection first —' });
+            var values;
+            if (!loaded) {
+                values = [{ value: current || '', text: '— Test the connection first —' }];
+            } else {
+                values = items.slice();
+                if (current && !values.some(function (v) { return v.value === current; })) {
+                    values.unshift({ value: current, text: current + ' (saved)' });
+                }
+                if (values.length === 0) {
+                    values.unshift({ value: '', text: '— No entries found —' });
+                }
             }
             values.forEach(function (v) {
                 var o = document.createElement('option');
@@ -94,27 +160,45 @@
             if (current) { sel.value = current; }
         }
 
+        function radarrProfileOptions(data) {
+            return (data.qualityProfiles || []).map(function (p) {
+                return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') };
+            });
+        }
+
+        function radarrFolderOptions(data) {
+            return (data.rootFolders || []).map(function (f) { return { value: f, text: f }; });
+        }
+
+        function radarrAutoSingle(id, options) {
+            // One option means no real choice — select it so Save just works.
+            if (options.length === 1) {
+                document.querySelector('#' + id).value = options[0].value;
+            }
+        }
+
         function aniBridgeIsHttpUrlRadarr(s) {
             return /^https?:\/\/.+/.test((s || '').trim());
         }
 
         document.querySelector('#AniBridgeRadarrPage').addEventListener('pageshow', function () {
             Dashboard.showLoadingMsg();
+            AniBridgeRadarr.test = null;
             ApiClient.getPluginConfiguration(AniBridgeRadarr.pluginId).then(function (config) {
                 document.querySelector('#RadarrEnabled').checked = config.RadarrEnabled;
                 document.querySelector('#RadarrUrl').value = config.RadarrUrl || '';
                 document.querySelector('#RadarrApiKey').value = config.RadarrApiKey || '';
+                document.querySelector('#RadarrMonitor').value = config.RadarrMonitor || 'movieOnly';
+                document.querySelector('#RadarrAvailability').value = config.RadarrAvailability || 'released';
                 var savedProfile = String(config.RadarrQualityProfileId || 1);
                 var savedFolder = config.RadarrRootFolder || '';
-                aniBridgeFillSelectRadarr('RadarrQualityProfileId', [], savedProfile);
-                aniBridgeFillSelectRadarr('RadarrRootFolder', [], savedFolder);
+                AniBridgeRadarr.snapshot = radarrFormState();
+                aniBridgeFillSelectRadarr('RadarrQualityProfileId', [], savedProfile, false);
+                aniBridgeFillSelectRadarr('RadarrRootFolder', [], savedFolder, false);
+                renderRadarrStatus();
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                     .then(function (s) {
-                        s = s || {};
-                        document.querySelector('#AniBridgeRadarrChecklist').textContent =
-                            'Shinden ' + (abPick(s, 'shindenOk', 'ShindenOk') ? '✓' : '✗') + '  ·  Sonarr ' +
-                            (abPick(s, 'sonarrOk', 'SonarrOk') ? '✓' : '✗') + '  ·  Radarr ' + (abPick(s, 'radarrOk', 'RadarrOk') ? '✓' : '✗') +
-                            (abPick(s, 'dryRun', 'DryRun') ? '  ·  DRY RUN' : '  ·  LIVE');
+                        renderRadarrChips(s);
                     }, function () { });
                 ApiClient.ajax({
                     type: 'GET',
@@ -122,12 +206,16 @@
                     dataType: 'json'
                 }).then(function (data) {
                     data = abNormArrRadarr(data);
+                    var profiles = radarrProfileOptions(data);
+                    var folders = radarrFolderOptions(data);
                     aniBridgeFillSelectRadarr('RadarrQualityProfileId',
-                        (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
-                        savedProfile);
+                        profiles, savedProfile, !data.error);
                     aniBridgeFillSelectRadarr('RadarrRootFolder',
-                        (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
-                        savedFolder);
+                        folders, savedFolder, !data.error);
+                    if (!data.error) {
+                        radarrAutoSingle('RadarrQualityProfileId', profiles);
+                        radarrAutoSingle('RadarrRootFolder', folders);
+                    }
                     document.querySelector('#AniBridgeRadarrWarn').textContent = data.error || '';
                     Dashboard.hideLoadingMsg();
                 }, function () {
@@ -138,16 +226,30 @@
             });
         });
 
+        ['RadarrEnabled', 'RadarrUrl', 'RadarrApiKey'].forEach(function (id) {
+            document.querySelector('#' + id).addEventListener('input', function () {
+                AniBridgeRadarr.test = null;
+                renderRadarrStatus();
+            });
+            document.querySelector('#' + id).addEventListener('change', function () {
+                AniBridgeRadarr.test = null;
+                renderRadarrStatus();
+            });
+        });
+
         document.querySelector('#RadarrTestBtn').addEventListener('click', function () {
             var url = document.querySelector('#RadarrUrl').value;
             var key = document.querySelector('#RadarrApiKey').value;
             document.querySelector('#RadarrUrlError').textContent =
                 aniBridgeIsHttpUrlRadarr(url) ? '' : 'URL should look like http://192.168.33.20:7878';
             if (!aniBridgeIsHttpUrlRadarr(url) || !key.trim()) {
-                document.querySelector('#AniBridgeRadarrTest').textContent = 'Enter URL and API key first.';
+                AniBridgeRadarr.test = { ok: false, msg: 'Enter URL and API key first, then Test.' };
+                renderRadarrStatus();
                 return;
             }
+            AniBridgeRadarr.test = null;
             var msg = document.querySelector('#AniBridgeRadarrTest');
+            msg.style.color = '';
             msg.textContent = 'Testing…';
             ApiClient.ajax({
                 type: 'POST',
@@ -157,16 +259,27 @@
                 dataType: 'json'
             }).then(function (data) {
                 data = abNormArrRadarr(data);
+                var profiles = radarrProfileOptions(data);
+                var folders = radarrFolderOptions(data);
                 aniBridgeFillSelectRadarr('RadarrQualityProfileId',
-                    (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
-                    document.querySelector('#RadarrQualityProfileId').value);
+                    profiles,
+                    document.querySelector('#RadarrQualityProfileId').value, !data.error);
                 aniBridgeFillSelectRadarr('RadarrRootFolder',
-                    (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
-                    document.querySelector('#RadarrRootFolder').value);
+                    folders,
+                    document.querySelector('#RadarrRootFolder').value, !data.error);
+                if (!data.error) {
+                    radarrAutoSingle('RadarrQualityProfileId', profiles);
+                    radarrAutoSingle('RadarrRootFolder', folders);
+                }
                 document.querySelector('#AniBridgeRadarrWarn').textContent = data.error || '';
-                msg.textContent = data.error ? ('Test: ' + data.error) : 'Test OK — lists loaded.';
+                AniBridgeRadarr.test = data.error
+                    ? { ok: false, msg: 'Test: ' + data.error }
+                    : { ok: true, msg: '✓ Connected — ' + data.qualityProfiles.length +
+                        ' profiles, ' + data.rootFolders.length + ' folders.' };
+                renderRadarrStatus();
             }, function () {
-                msg.textContent = 'Test failed to run.';
+                AniBridgeRadarr.test = { ok: false, msg: 'Test failed to run.' };
+                renderRadarrStatus();
             });
         });
 
@@ -191,8 +304,17 @@
                 config.RadarrApiKey = document.querySelector('#RadarrApiKey').value.trim();
                 config.RadarrQualityProfileId = parseInt(document.querySelector('#RadarrQualityProfileId').value, 10) || 1;
                 config.RadarrRootFolder = document.querySelector('#RadarrRootFolder').value;
+                config.RadarrMonitor = document.querySelector('#RadarrMonitor').value || 'movieOnly';
+                config.RadarrAvailability = document.querySelector('#RadarrAvailability').value || 'released';
                 ApiClient.updatePluginConfiguration(AniBridgeRadarr.pluginId, config).then(function (result) {
                     Dashboard.processPluginConfigurationUpdateResult(result);
+                    AniBridgeRadarr.snapshot = radarrFormState();
+                    AniBridgeRadarr.test = null;
+                    renderRadarrStatus();
+                    ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
+                        .then(function (s) {
+                            renderRadarrChips(s);
+                        }, function () { });
                 });
             });
             return false;
