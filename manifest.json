@@ -9,11 +9,11 @@
     "versions": [
       {
         "version": "0.2.1.0",
-        "changelog": "AniList 429 retry, year-suffix matching, last-sync report on the settings page.",
+        "changelog": "Settings page navigation, failed-sync report with error message.",
         "targetAbi": "12.1.0.0",
         "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.2.1/anibridge_0.2.1.zip",
-        "checksum": "23730d891733df5cca67cf80ee0ff3ca",
-        "timestamp": "2026-09-28 21:40:54"
+        "checksum": "33cd4a5504adbfb8c9706785c54a5b75",
+        "timestamp": "2026-09-28 21:52:30"
       },
       {
         "version": "0.2.0.0",

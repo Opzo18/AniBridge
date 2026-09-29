@@ -10,5 +10,10 @@ public sealed class SyncReport
 
     public bool DryRun { get; init; }
 
+    /// <summary>
+    /// Fatal sync error (e.g. list fetch failed). Set when no per-item results exist.
+    /// </summary>
+    public string? Error { get; init; }
+
     public SyncResult Result { get; init; } = new();
 }

@@ -2,6 +2,11 @@
     data-require="emby-input,emby-button,emby-checkbox,emby-select">
     <div data-role="content">
         <div class="content-primary">
+            <div class="fieldDescription">AniBridge:
+                <a href="#" onclick="aniBridgeNav('AniBridge Shinden');return false;">Shinden</a> &#183;
+                <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
+                <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
+            </div>
             <form id="AniBridgeRadarrForm">
                 <h3 class="sectionTitle">Radarr (movies)</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -102,5 +107,11 @@
             });
             return false;
         });
+
+        function aniBridgeNav(page) {
+            if (window.Dashboard && Dashboard.navigate) {
+                Dashboard.navigate('configurationpage?name=' + encodeURIComponent(page));
+            }
+        }
     </script>
 </div>
