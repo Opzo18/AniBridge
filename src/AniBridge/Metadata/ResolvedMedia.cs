@@ -10,4 +10,5 @@ public sealed record ResolvedMedia(
     int AniListId,
     int? TmdbId,
     int? Year,
-    int? Episodes);
+    int? Episodes,
+    string? MatchedAlias = null);

@@ -40,6 +40,40 @@ public sealed class ShindenListService
     }
 
     /// <summary>
+    /// Alternate titles from a Shinden title page, for AniList retry queries.
+    /// Best-effort: any failure yields an empty list. Accepts the absolute
+    /// AnimeListItem.Url or a relative /series/… path.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetTitleAliasesAsync(
+        string titleUrl, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var relative = titleUrl;
+            const string marker = ".pl/";
+            var i = relative.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (i >= 0)
+            {
+                relative = relative[(i + marker.Length)..];
+            }
+
+            relative = relative.Trim().TrimStart('/');
+            if (relative.Length == 0)
+            {
+                return [];
+            }
+
+            var html = await _client.GetStringAsync(relative, cancellationToken).ConfigureAwait(false);
+            return await ShindenParser.ParseTitleAliasesAsync(html, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Shinden: could not fetch title aliases from {Url}.", titleUrl);
+            return [];
+        }
+    }
+
+    /// <summary>
     /// Accepts a bare list ID ("420984-opzo") or a pasted list URL
     /// (https://shinden.pl/animelist/420984-opzo, with or without /all).
     /// </summary>

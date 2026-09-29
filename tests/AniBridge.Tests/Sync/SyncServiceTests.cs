@@ -185,6 +185,32 @@ public class SyncServiceTests
         Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
     }
 
+    [Fact]
+    public async Task RunAsync_DryRun_IncludesMatchedAliasInDetail()
+    {
+        var provider = new FakeProvider(Item("Dogulwang"));
+        var metadata = new FakeMetadata(new Dictionary<string, ResolvedMedia?>
+        {
+            ["Dogulwang"] = new ResolvedMedia("Dogulwang", MediaType.Tv, 187538, null, 2026, 12, "Tomb Raider King"),
+        });
+
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("""[{"id":0,"title":"Dogulwang","tvdbId":501}]"""));
+        handler.Enqueue(Json("[]")); // not present
+
+        var config = Config();
+        config.DryRun = true;
+        var service = Create(provider, metadata, config,
+            new Lazy<SonarrClient>(() => Sonarr(handler)),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")));
+
+        var result = await service.RunAsync();
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(SyncOutcome.WouldAdd, item.Outcome);
+        Assert.Equal("Sonarr (as 'Tomb Raider King')", item.Detail);
+    }
+
     private sealed class FakeProvider(params AnimeListItem[] items) : IAnimeProvider
     {
         public string Name => "Fake";

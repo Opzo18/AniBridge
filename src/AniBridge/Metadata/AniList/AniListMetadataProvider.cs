@@ -12,48 +12,98 @@ public sealed class AniListMetadataProvider : IMetadataProvider
 {
     public const string ProviderName = "AniList";
 
+    /// <summary>
+    /// Max extra AniList queries per title, from Shinden alternate titles.
+    /// </summary>
+    private const int MaxAliasQueries = 5;
+
     private readonly AniListClient _client;
     private readonly ILogger<AniListMetadataProvider> _logger;
+    private readonly Func<AnimeListItem, CancellationToken, Task<IReadOnlyList<string>>>? _aliases;
 
-    public AniListMetadataProvider(AniListClient client, ILogger<AniListMetadataProvider> logger)
+    public AniListMetadataProvider(
+        AniListClient client,
+        ILogger<AniListMetadataProvider> logger,
+        Func<AnimeListItem, CancellationToken, Task<IReadOnlyList<string>>>? aliasProvider = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _aliases = aliasProvider;
     }
 
     public string Name => ProviderName;
 
     public async Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default)
     {
-        var candidates = await _client.SearchAnimeAsync(item.Title, cancellationToken).ConfigureAwait(false);
-        if (candidates.Count == 0)
+        var direct = await TryResolveAsync(item.Title, null, cancellationToken).ConfigureAwait(false);
+        if (direct is not null)
+        {
+            _logger.LogInformation(
+                "AniList: {Title} → {Type} (id {AniListId}).", item.Title, direct.Type, direct.AniListId);
+            return direct;
+        }
+
+        if (_aliases is null)
         {
             _logger.LogWarning("AniList: {Title} not found, skipping.", item.Title);
             return null;
         }
 
-        var match = candidates.FirstOrDefault(c => IsTitleMatch(c, item.Title))
-            ?? UniqueStrippedMatch(candidates, item.Title);
+        var aliases = await _aliases(item, cancellationToken).ConfigureAwait(false);
+        var wanted = Normalize(item.Title);
+        var tried = 0;
+        foreach (var alias in aliases)
+        {
+            if (tried >= MaxAliasQueries)
+            {
+                break;
+            }
+
+            if (string.IsNullOrWhiteSpace(alias) || Normalize(alias) == wanted)
+            {
+                continue;
+            }
+
+            tried++;
+            var via = await TryResolveAsync(alias, alias, cancellationToken).ConfigureAwait(false);
+            if (via is not null)
+            {
+                _logger.LogInformation(
+                    "AniList: {Title} → via alias {Alias} → {Type} (id {AniListId}).",
+                    item.Title, alias, via.Type, via.AniListId);
+                return via;
+            }
+        }
+
+        _logger.LogWarning(
+            "AniList: {Title} not found ({Tried} alias queries), skipping.", item.Title, tried);
+        return null;
+    }
+
+    private async Task<ResolvedMedia?> TryResolveAsync(
+        string query, string? matchedAlias, CancellationToken cancellationToken)
+    {
+        var candidates = await _client.SearchAnimeAsync(query, cancellationToken).ConfigureAwait(false);
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        var match = candidates.FirstOrDefault(c => IsTitleMatch(c, query))
+            ?? UniqueStrippedMatch(candidates, query);
         if (match is null)
         {
-            _logger.LogWarning(
-                "AniList: {Title} is ambiguous ({Count} candidates, no exact match), skipping.",
-                item.Title, candidates.Count);
             return null;
         }
 
         var type = MapFormat(match.Format);
         if (type is null)
         {
-            _logger.LogWarning(
-                "AniList: {Title} has unsupported format {Format}, skipping.",
-                item.Title, match.Format);
             return null;
         }
 
-        _logger.LogInformation(
-            "AniList: {Title} → {Type} (id {AniListId}).", item.Title, type, match.Id);
-        return new ResolvedMedia(item.Title, type.Value, match.Id, null, match.StartDate?.Year, match.Episodes);
+        return new ResolvedMedia(
+            query, type.Value, match.Id, null, match.StartDate?.Year, match.Episodes, matchedAlias);
     }
 
     public static bool IsTitleMatch(AniListMedia candidate, string title)
@@ -66,7 +116,9 @@ public sealed class AniListMetadataProvider : IMetadataProvider
         var wanted = Normalize(title);
         return (candidate.Title.Romaji is not null && Normalize(candidate.Title.Romaji) == wanted)
             || (candidate.Title.English is not null && Normalize(candidate.Title.English) == wanted)
-            || (candidate.Title.Native is not null && Normalize(candidate.Title.Native) == wanted);
+            || (candidate.Title.Native is not null && Normalize(candidate.Title.Native) == wanted)
+            || (candidate.Synonyms is not null
+                && candidate.Synonyms.Any(s => s is not null && Normalize(s) == wanted));
     }
 
     /// <summary>
@@ -87,7 +139,9 @@ public sealed class AniListMetadataProvider : IMetadataProvider
 
             var hit = (c.Title.Romaji is not null && StripYear(Normalize(c.Title.Romaji)) == wanted)
                 || (c.Title.English is not null && StripYear(Normalize(c.Title.English)) == wanted)
-                || (c.Title.Native is not null && StripYear(Normalize(c.Title.Native)) == wanted);
+                || (c.Title.Native is not null && StripYear(Normalize(c.Title.Native)) == wanted)
+                || (c.Synonyms is not null
+                    && c.Synonyms.Any(s => s is not null && StripYear(Normalize(s)) == wanted));
             if (!hit)
             {
                 continue;

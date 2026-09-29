@@ -14,6 +14,52 @@ public class ShindenParserTests
         File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, AllFixture));
 
     [Fact]
+    public async Task ParseTitleAliases_JsonLdAlternateName_ReturnsAliases()
+    {
+        const string Html = """
+            <html><head><script type="application/ld+json">
+            {"@type":"TVSeries","name":"Dogulwang","alternateName":["도굴왕","盗掘王","Tomb Raider King"]}
+            </script></head><body></body></html>
+            """;
+
+        var aliases = await ShindenParser.ParseTitleAliasesAsync(Html);
+
+        Assert.Equal(["도굴왕", "盗掘王", "Tomb Raider King"], aliases);
+    }
+
+    [Fact]
+    public async Task ParseTitleAliases_OgTitleAndLabeledRow_SplitsAndDedupes()
+    {
+        const string Html = """
+            <html><head><meta property="og:title" content="Dogulwang" /></head><body>
+            <dl><dt>Tytuł</dt><dd>Dogulwang</dd><dt>Pozostałe tytuły</dt><dd>Tomb Raider King / Toukutsu Ou</dd></dl>
+            </body></html>
+            """;
+
+        var aliases = await ShindenParser.ParseTitleAliasesAsync(Html);
+
+        Assert.Equal(["Dogulwang", "Tomb Raider King", "Toukutsu Ou"], aliases);
+    }
+
+    [Fact]
+    public async Task ParseTitleAliases_NoAliasMarkup_ReturnsEmpty()
+    {
+        const string Html = "<html><head><title>X</title></head><body><p>brak danych</p></body></html>";
+
+        Assert.Empty(await ShindenParser.ParseTitleAliasesAsync(Html));
+    }
+
+    [Fact]
+    public async Task ParseTitleAliases_MalformedJsonLd_DoesNotThrow()
+    {
+        const string Html = """
+            <html><head><script type="application/ld+json">not json{{{</script></head><body></body></html>
+            """;
+
+        Assert.Empty(await ShindenParser.ParseTitleAliasesAsync(Html));
+    }
+
+    [Fact]
     public async Task ParseAnimeList_AllPage_ReturnsAllEntries()
     {
         var entries = await ShindenParser.ParseAnimeListAsync(await LoadFixtureAsync());

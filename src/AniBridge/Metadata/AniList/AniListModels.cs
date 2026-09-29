@@ -35,6 +35,13 @@ public sealed class AniListMedia
     public AniListTitle? Title { get; init; }
 
     /// <summary>
+    /// Alternate titles, e.g. "Tomb Raider King" → ["Dogulwang", "Toukutsu Ou"].
+    /// Matched exactly like the main titles (never fuzzy).
+    /// </summary>
+    [JsonPropertyName("synonyms")]
+    public List<string>? Synonyms { get; init; }
+
+    /// <summary>
     /// E.g. TV, TV_SHORT, MOVIE, SPECIAL, OVA, ONA.
     /// </summary>
     [JsonPropertyName("format")]

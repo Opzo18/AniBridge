@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AngleSharp.Html.Parser;
 
 namespace AniBridge.Providers.Shinden;
@@ -73,5 +74,127 @@ public static class ShindenParser
 
         int? total = parts.Length == 2 && int.TryParse(parts[1], out var t) ? t : null;
         return (watched, total);
+    }
+
+    /// <summary>
+    /// Alternate titles from a Shinden title page (/series/…), used as extra
+    /// AniList queries when the list title does not match (e.g. "Dogulwang" →
+    /// "도굴왕, 盗掘王, Tomb Raider King").
+    /// Best-effort: unknown markup yields an empty list, never an exception.
+    /// Strategies: JSON-LD alternateName, og:title, labeled "…tytuły" rows.
+    /// </summary>
+    public static async Task<IReadOnlyList<string>> ParseTitleAliasesAsync(
+        string html, CancellationToken cancellationToken = default)
+    {
+        var found = new List<string>();
+        try
+        {
+            var parser = new HtmlParser();
+            var doc = await parser.ParseDocumentAsync(html, cancellationToken).ConfigureAwait(false);
+
+            foreach (var block in doc.QuerySelectorAll("script[type=\"application/ld+json\"]"))
+            {
+                CollectJsonLdAliases(block.TextContent, found);
+            }
+
+            var og = doc.QuerySelector("meta[property=\"og:title\"]")?.GetAttribute("content");
+            AddAliases(og, found);
+
+            foreach (var el in doc.QuerySelectorAll("dt, th, .info-label, .label"))
+            {
+                var label = el.TextContent.Trim().ToLowerInvariant();
+                if (!label.Contains("tytu", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var sibling = el.NextElementSibling;
+                var value = sibling?.TextContent
+                    ?? el.ParentElement?.TextContent.Replace(el.TextContent, string.Empty);
+                AddAliases(value, found);
+            }
+        }
+        catch
+        {
+            // Best-effort by design.
+        }
+
+        return found
+            .Select(a => a.Trim())
+            .Where(a => a.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .ToList();
+    }
+
+    private static void AddAliases(string? value, List<string> found)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        foreach (var part in value.Split([',', '/', ';', '\n', '\r'], StringSplitOptions.TrimEntries))
+        {
+            if (part.Length > 0)
+            {
+                found.Add(part);
+            }
+        }
+    }
+
+    private static void CollectJsonLdAliases(string json, List<string> found)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            CollectJsonLdAliases(doc.RootElement, found);
+        }
+        catch
+        {
+            // Malformed JSON-LD: ignore this block.
+        }
+    }
+
+    private static void CollectJsonLdAliases(JsonElement el, List<string> found)
+    {
+        switch (el.ValueKind)
+        {
+            case JsonValueKind.Array:
+                foreach (var item in el.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String)
+                    {
+                        AddAliases(item.GetString(), found);
+                    }
+                    else
+                    {
+                        CollectJsonLdAliases(item, found);
+                    }
+                }
+
+                break;
+            case JsonValueKind.Object:
+                foreach (var prop in el.EnumerateObject())
+                {
+                    if (prop.NameEquals("alternateName"))
+                    {
+                        if (prop.Value.ValueKind == JsonValueKind.String)
+                        {
+                            AddAliases(prop.Value.GetString(), found);
+                        }
+                        else
+                        {
+                            CollectJsonLdAliases(prop.Value, found);
+                        }
+                    }
+                    else
+                    {
+                        CollectJsonLdAliases(prop.Value, found);
+                    }
+                }
+
+                break;
+        }
     }
 }

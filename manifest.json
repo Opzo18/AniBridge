@@ -8,6 +8,14 @@
     "overview": "Shinden -> Sonarr/Radarr",
     "versions": [
       {
+        "version": "0.4.0.0",
+        "changelog": "Smarter AniList matching: synonyms plus retry queries from Shinden alternate titles (exact matches only).",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/Opzo18/AniBridge/releases/download/v0.4.0/anibridge_0.4.0.zip",
+        "checksum": "951ea6f3cdc754e0eafc7d4b4d1859e1",
+        "timestamp": "2026-09-29 09:42:41"
+      },
+      {
         "version": "0.3.2.0",
         "changelog": "Fix settings-page data parsing (PascalCase + string enums), live sync progress with interim results, scope filter (only enabled statuses sync), empty-state guards.",
         "targetAbi": "12.1.0.0",

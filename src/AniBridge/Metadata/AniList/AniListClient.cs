@@ -18,6 +18,7 @@ public sealed class AniListClient
             media(search: $search, type: ANIME) {
               id
               title { romaji english native }
+              synonyms
               format
               episodes
               startDate { year }

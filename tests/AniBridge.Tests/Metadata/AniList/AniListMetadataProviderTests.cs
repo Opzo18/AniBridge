@@ -60,6 +60,116 @@ public class AniListMetadataProviderTests
     }
 
     [Fact]
+    public async Task ResolveAsync_SynonymMatch_ReturnsMedia()
+    {
+        // Shinden lists "Dogulwang"; AniList's main titles differ, but "Dogulwang"
+        // is among the entry's synonyms — still an exact match, never a guess.
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":187538,"title":{"romaji":"Toukutsu Ou","english":"Tomb Raider King","native":"도굴왕"},"synonyms":["Dogulwang","Dogul Wang"],"format":"TV","episodes":12,"startDate":{"year":2026}}
+            ]}}}
+            """;
+
+        var media = await CreateProvider(Json).ResolveAsync(Item("Dogulwang"));
+
+        Assert.NotNull(media);
+        Assert.Equal(187538, media.AniListId);
+        Assert.Equal(MediaType.Tv, media.Type);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SynonymMatchWithYearSuffix_FallsBackToStripped()
+    {
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":99,"title":{"romaji":"Some Show","english":null,"native":null},"synonyms":["Inny Tytul (2016)"],"format":"TV","episodes":12,"startDate":{"year":2016}}
+            ]}}}
+            """;
+
+        var media = await CreateProvider(Json).ResolveAsync(Item("Inny Tytul (2016)"));
+
+        Assert.NotNull(media);
+        Assert.Equal(99, media.AniListId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NoSynonymField_DoesNotThrow()
+    {
+        // Older/cached responses without "synonyms" must keep working.
+        const string Json = """
+            {"data":{"Page":{"media":[
+              {"id":154587,"title":{"romaji":"Sousou no Frieren","english":null,"native":null},"format":"TV","episodes":28,"startDate":{"year":2023}}
+            ]}}}
+            """;
+
+        var media = await CreateProvider(Json).ResolveAsync(Item("Sousou no Frieren"));
+
+        Assert.NotNull(media);
+        Assert.Equal(154587, media.AniListId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasMatch_ResolvesViaSecondQuery()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("""{"data":{"Page":{"media":[]}}}""")); // direct: nothing
+        handler.Enqueue(Json("""
+            {"data":{"Page":{"media":[
+              {"id":187538,"title":{"romaji":"Toukutsu Ou","english":"Tomb Raider King","native":"도굴왕"},"format":"TV","episodes":12,"startDate":{"year":2026}}
+            ]}}}
+            """));
+        var http = new HttpClient(handler) { BaseAddress = new Uri(AniListClient.Endpoint + "/") };
+        var client = new AniListClient(http, NullLogger<AniListClient>.Instance);
+        var provider = new AniListMetadataProvider(
+            client,
+            NullLogger<AniListMetadataProvider>.Instance,
+            (_, _) => Task.FromResult<IReadOnlyList<string>>(["Tomb Raider King"]));
+
+        var media = await provider.ResolveAsync(Item("Dogulwang"));
+
+        Assert.NotNull(media);
+        Assert.Equal(187538, media.AniListId);
+        Assert.Equal("Tomb Raider King", media.MatchedAlias);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasQueries_CappedAtFive()
+    {
+        var handler = new QueueHandler();
+        for (var i = 0; i < 7; i++)
+        {
+            handler.Enqueue(Json("""{"data":{"Page":{"media":[]}}}"""));
+        }
+
+        var http = new HttpClient(handler) { BaseAddress = new Uri(AniListClient.Endpoint + "/") };
+        var client = new AniListClient(http, NullLogger<AniListClient>.Instance);
+        var provider = new AniListMetadataProvider(
+            client,
+            NullLogger<AniListMetadataProvider>.Instance,
+            (_, _) => Task.FromResult<IReadOnlyList<string>>(["A1", "A2", "A3", "A4", "A5", "A6", "A7"]));
+
+        Assert.Null(await provider.ResolveAsync(Item("Missing Title")));
+        Assert.Equal(6, handler.Requests.Count); // 1 direct + 5 alias
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasSameAsTitle_IsSkipped()
+    {
+        var handler = new QueueHandler();
+        handler.Enqueue(Json("""{"data":{"Page":{"media":[]}}}"""));
+        var http = new HttpClient(handler) { BaseAddress = new Uri(AniListClient.Endpoint + "/") };
+        var client = new AniListClient(http, NullLogger<AniListClient>.Instance);
+        var provider = new AniListMetadataProvider(
+            client,
+            NullLogger<AniListMetadataProvider>.Instance,
+            (_, _) => Task.FromResult<IReadOnlyList<string>>(["Missing Title"]));
+
+        Assert.Null(await provider.ResolveAsync(Item("Missing Title")));
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task ResolveAsync_InexactOnly_ReturnsNull()
     {
         var media = await CreateProvider(FrierenJson).ResolveAsync(Item("Frieren"));

@@ -180,7 +180,10 @@ public sealed class SyncService
             {
                 _logger.LogInformation(
                     "AniBridge (dry run): would add {Title} to {Arr}.", item.Title, arr.Name);
-                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, arr.Name, item.Url, aniListUrl);
+                var wouldAddDetail = media.MatchedAlias is null
+                    ? arr.Name
+                    : $"{arr.Name} (as '{media.MatchedAlias}')";
+                return new SyncItem(item.Title, item.Status, SyncOutcome.WouldAdd, wouldAddDetail, item.Url, aniListUrl);
             }
 
             await arr.AddAsync(media, item.Status, cancellationToken).ConfigureAwait(false);

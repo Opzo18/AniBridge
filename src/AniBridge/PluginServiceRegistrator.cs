@@ -25,7 +25,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IAnimeProvider, ShindenProvider>();
         serviceCollection.AddSingleton<AniListClient>(sp =>
             AniListClient.CreateDefault(sp.GetRequiredService<ILogger<AniListClient>>()));
-        serviceCollection.AddSingleton<IMetadataProvider, AniListMetadataProvider>();
+        serviceCollection.AddSingleton<IMetadataProvider>(sp => new AniListMetadataProvider(
+            sp.GetRequiredService<AniListClient>(),
+            sp.GetRequiredService<ILogger<AniListMetadataProvider>>(),
+            async (item, ct) => await sp.GetRequiredService<ShindenListService>()
+                .GetTitleAliasesAsync(item.Url, ct).ConfigureAwait(false)));
         serviceCollection.AddSingleton<SonarrClient>(sp =>
         {
             var config = Plugin.Instance?.Configuration;
