@@ -9,8 +9,8 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-Version **0.4.3** live: miss diagnostics (`closest`/`tried` in skipped details),
-spacing-proof fallback matching, Shinden aliases debug endpoint, chip headers. ✅
+Version **0.4.4** live: tab-bar navigation with status, Show/Hide buttons,
+brighter report actions. ✅
 (`dotnet test`: 123/123 passed)
 
 ## Requirements

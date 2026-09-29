@@ -2,13 +2,7 @@
     data-require="emby-input,emby-button,emby-checkbox,emby-select">
     <div data-role="content">
         <div class="content-primary">
-            <div class="fieldDescription">AniBridge:
-                <a href="#" onclick="aniBridgeNav('AniBridge');return false;">Overview</a> &#183;
-                <a href="#" onclick="aniBridgeNav('AniBridge Shinden');return false;">Shinden</a> &#183;
-                <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
-                <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
-            </div>
-            <div id="AniBridgeRadarrChips" style="display:flex;gap:0.4em;flex-wrap:wrap;margin-bottom:0.5em;"></div>
+            <div id="AniBridgeRadarrChips" style="margin-bottom:0.8em;"></div>
             <form id="AniBridgeRadarrForm">
                 <h3 class="sectionTitle">Radarr (movies)</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -24,10 +18,11 @@
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">API key</label>
-                    <div style="position:relative;">
-                        <input id="RadarrApiKey" type="password" is="emby-input" autocomplete="off" style="padding-right:2.5em;width:100%;box-sizing:border-box;" />
-                        <button id="RadarrShowKey" type="button" title="Show API key" aria-label="Show API key"
-                            style="position:absolute;right:0.4em;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1em;opacity:0.75;">👁</button>
+                    <div style="display:flex;gap:0.4em;align-items:center;">
+                        <input id="RadarrApiKey" type="password" is="emby-input" autocomplete="off" style="flex:1;min-width:0;" />
+                        <button id="RadarrShowKey" type="button" is="emby-button" class="raised emby-button" style="flex:none;">
+                            <span>Show</span>
+                        </button>
                     </div>
                     <div class="fieldDescription">Settings → General → Security in Radarr.</div>
                 </div>
@@ -94,25 +89,41 @@
             };
         }
 
-        function abChipRadarr(text, bg) {
-            var s = document.createElement('span');
-            s.textContent = text;
-            s.style.cssText = 'background:' + bg + ';color:#fff;border-radius:0.8em;' +
-                'padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
-            return s;
-        }
-
         function renderRadarrChips(s) {
             s = s || {};
             var box = document.querySelector('#AniBridgeRadarrChips');
             box.innerHTML = '';
-            [['Shinden', !!abPick(s, 'shindenOk', 'ShindenOk')],
-             ['Sonarr', !!abPick(s, 'sonarrOk', 'SonarrOk')],
-             ['Radarr', !!abPick(s, 'radarrOk', 'RadarrOk')]].forEach(function (c) {
-                box.appendChild(abChipRadarr(c[0] + ' ' + (c[1] ? '✓' : '✗'), c[1] ? '#27ae60' : '#e74c3c'));
+            var bar = document.createElement('div');
+            bar.style.cssText = 'display:flex;gap:0.4em;flex-wrap:wrap;align-items:center;';
+            var pages = [
+                ['Overview', 'AniBridge', null],
+                ['Shinden', 'AniBridge Shinden', !!abPick(s, 'shindenOk', 'ShindenOk')],
+                ['Sonarr', 'AniBridge Sonarr', !!abPick(s, 'sonarrOk', 'SonarrOk')],
+                ['Radarr', 'AniBridge Radarr', !!abPick(s, 'radarrOk', 'RadarrOk')]
+            ];
+            pages.forEach(function (p) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                var active = p[1] === 'AniBridge Radarr';
+                b.style.cssText = 'border:none;border-radius:0.4em;padding:0.4em 0.9em;' +
+                    'cursor:' + (active ? 'default' : 'pointer') + ';' +
+                    'font-weight:' + (active ? 'bold' : 'normal') + ';' +
+                    'background:' + (active ? '#00a4dc' : 'rgba(127,140,141,0.25)') + ';color:#fff;';
+                b.textContent = p[0] + (p[2] === null ? '' : (p[2] ? ' ✓' : ' ✗'));
+                if (!active) {
+                    (function (page) {
+                        b.addEventListener('click', function () { aniBridgeNav(page); });
+                    })(p[1]);
+                }
+                bar.appendChild(b);
             });
             var dryRun = !!abPick(s, 'dryRun', 'DryRun');
-            box.appendChild(abChipRadarr(dryRun ? 'DRY RUN' : 'LIVE', dryRun ? '#f39c12' : '#27ae60'));
+            var mode = document.createElement('span');
+            mode.style.cssText = 'font-size:0.8em;font-weight:bold;color:' +
+                (dryRun ? '#f39c12' : '#27ae60') + ';';
+            mode.textContent = dryRun ? 'DRY RUN' : 'LIVE';
+            bar.appendChild(mode);
+            box.appendChild(bar);
         }
 
         function radarrFormState() {
@@ -287,14 +298,11 @@
             });
         });
 
-        document.querySelector('#RadarrShowKey').addEventListener('click', function (e) {
-            e.preventDefault();
+        document.querySelector('#RadarrShowKey').addEventListener('click', function () {
             var input = document.querySelector('#RadarrApiKey');
             var show = input.type === 'password';
             input.type = show ? 'text' : 'password';
-            this.textContent = show ? '🙈' : '👁';
-            this.title = show ? 'Hide API key' : 'Show API key';
-            this.setAttribute('aria-label', this.title);
+            this.textContent = show ? 'Hide' : 'Show';
         });
 
         document.querySelector('#AniBridgeRadarrForm').addEventListener('submit', function (e) {

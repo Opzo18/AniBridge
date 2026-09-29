@@ -2,13 +2,7 @@
     data-require="emby-input,emby-button,emby-checkbox">
     <div data-role="content">
         <div class="content-primary">
-            <div class="fieldDescription">AniBridge:
-                <a href="#" onclick="aniBridgeNav('AniBridge');return false;">Overview</a> &#183;
-                <a href="#" onclick="aniBridgeNav('AniBridge Shinden');return false;">Shinden</a> &#183;
-                <a href="#" onclick="aniBridgeNav('AniBridge Sonarr');return false;">Sonarr</a> &#183;
-                <a href="#" onclick="aniBridgeNav('AniBridge Radarr');return false;">Radarr</a>
-            </div>
-            <div id="AniBridgeShindenChips" style="display:flex;gap:0.4em;flex-wrap:wrap;margin-bottom:0.5em;"></div>
+            <div id="AniBridgeShindenChips" style="margin-bottom:0.8em;"></div>
             <form id="AniBridgeShindenForm">
                 <h3 class="sectionTitle">Shinden.pl</h3>
                 <div class="checkboxContainer checkboxContainer-withDescription">
@@ -24,10 +18,11 @@
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ShindenPassword">Password</label>
-                    <div style="position:relative;">
-                        <input id="ShindenPassword" type="password" is="emby-input" autocomplete="off" style="padding-right:2.5em;width:100%;box-sizing:border-box;" />
-                        <button id="ShindenShowPass" type="button" title="Show password" aria-label="Show password"
-                            style="position:absolute;right:0.4em;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1em;opacity:0.75;">👁</button>
+                    <div style="display:flex;gap:0.4em;align-items:center;">
+                        <input id="ShindenPassword" type="password" is="emby-input" autocomplete="off" style="flex:1;min-width:0;" />
+                        <button id="ShindenShowPass" type="button" is="emby-button" class="raised emby-button" style="flex:none;">
+                            <span>Show</span>
+                        </button>
                     </div>
                 </div>
                 <div class="inputContainer">
@@ -234,26 +229,49 @@
             return new Date(iso).toLocaleString();
         }
 
+        function abBuildTabs(box, current, s) {
+            box.innerHTML = '';
+            var bar = document.createElement('div');
+            bar.style.cssText = 'display:flex;gap:0.4em;flex-wrap:wrap;align-items:center;';
+            var pages = [
+                ['Overview', 'AniBridge', null],
+                ['Shinden', 'AniBridge Shinden', s.shindenOk],
+                ['Sonarr', 'AniBridge Sonarr', s.sonarrOk],
+                ['Radarr', 'AniBridge Radarr', s.radarrOk]
+            ];
+            pages.forEach(function (p) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                var active = p[1] === current;
+                b.style.cssText = 'border:none;border-radius:0.4em;padding:0.4em 0.9em;' +
+                    'cursor:' + (active ? 'default' : 'pointer') + ';' +
+                    'font-weight:' + (active ? 'bold' : 'normal') + ';' +
+                    'background:' + (active ? '#00a4dc' : 'rgba(127,140,141,0.25)') + ';color:#fff;';
+                b.textContent = p[0] + (p[2] === null ? '' : (p[2] ? ' ✓' : ' ✗'));
+                if (!active) {
+                    (function (page) {
+                        b.addEventListener('click', function () { aniBridgeNav(page); });
+                    })(p[1]);
+                }
+                bar.appendChild(b);
+            });
+            var mode = document.createElement('span');
+            mode.style.cssText = 'font-size:0.8em;font-weight:bold;color:' +
+                (s.dryRun ? '#f39c12' : '#27ae60') + ';';
+            mode.textContent = s.dryRun ? 'DRY RUN' : 'LIVE';
+            bar.appendChild(mode);
+            box.appendChild(bar);
+            return bar;
+        }
+
         function aniBridgeLoadStatus() {
             ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                 .then(function (s) {
                     s = abNormStatus(s);
                     var box = document.querySelector('#AniBridgeShindenChips');
-                    box.innerHTML = '';
-                    [['Shinden', s.shindenOk], ['Sonarr', s.sonarrOk], ['Radarr', s.radarrOk]].forEach(function (c) {
-                        var chip = document.createElement('span');
-                        chip.textContent = c[0] + ' ' + (c[1] ? '✓' : '✗');
-                        chip.style.cssText = 'background:' + (c[1] ? '#27ae60' : '#e74c3c') + ';color:#fff;' +
-                            'border-radius:0.8em;padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
-                        box.appendChild(chip);
-                    });
-                    var mode = document.createElement('span');
-                    mode.textContent = s.dryRun ? 'DRY RUN' : 'LIVE';
-                    mode.style.cssText = 'background:' + (s.dryRun ? '#f39c12' : '#27ae60') + ';color:#fff;' +
-                        'border-radius:0.8em;padding:0.05em 0.55em;font-size:0.8em;white-space:nowrap;';
-                    box.appendChild(mode);
+                    abBuildTabs(box, 'AniBridge Shinden', s);
                     if (s.hint) {
-                        var hint = document.createElement('span');
+                        var hint = document.createElement('div');
                         hint.className = 'fieldDescription';
                         hint.textContent = s.hint;
                         box.appendChild(hint);
@@ -313,7 +331,7 @@
             var a = document.createElement('a');
             a.href = href || '#';
             a.textContent = text;
-            a.style.cssText = 'text-decoration:none;opacity:0.65;font-size:0.85em;';
+            a.style.cssText = 'text-decoration:none;font-size:0.9em;';
             if (href) { a.target = '_blank'; a.rel = 'noopener'; }
             if (onClick) {
                 a.addEventListener('click', onClick);
@@ -584,14 +602,11 @@
             return false;
         });
 
-        document.querySelector('#ShindenShowPass').addEventListener('click', function (e) {
-            e.preventDefault();
+        document.querySelector('#ShindenShowPass').addEventListener('click', function () {
             var input = document.querySelector('#ShindenPassword');
             var show = input.type === 'password';
             input.type = show ? 'text' : 'password';
-            this.textContent = show ? '🙈' : '👁';
-            this.title = show ? 'Hide password' : 'Show password';
-            this.setAttribute('aria-label', this.title);
+            this.textContent = show ? 'Hide' : 'Show';
         });
 
         document.querySelector('#AniBridgeTestShinden').addEventListener('click', function () {
