@@ -9,10 +9,9 @@ AniBridge does **not** talk to qBittorrent — Sonarr/Radarr handle that themsel
 
 ## Status
 
-Version **0.3.0** live: Overview page, Test buttons (Shinden/Sonarr/Radarr),
-live sync status with auto-refresh, searchable report with history (last 10)
-and per-title Shinden/AniList links + hints. ✅
-(`dotnet test`: 91/91 passed)
+Version **0.3.1** live: fixed settings-page parsing, live sync progress
+with interim results, empty-state guards. ✅
+(`dotnet test`: 94/94 passed)
 
 ## Requirements
 

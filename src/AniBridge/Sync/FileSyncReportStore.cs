@@ -7,6 +7,14 @@ public interface ISyncReportStore
 {
     void Save(SyncReport report);
 
+    /// <summary>
+    /// Interim snapshot while the sync is running: updates the last-sync file
+    /// without appending to history. Best-effort; default is a no-op for old fakes.
+    /// </summary>
+    void SaveProgress(SyncReport report)
+    {
+    }
+
     SyncReport? Load();
 
     /// <summary>
@@ -47,6 +55,22 @@ public sealed class FileSyncReportStore : ISyncReportStore
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
             File.WriteAllText(_filePath, JsonSerializer.Serialize(report));
             SaveHistoryLocked(report);
+        }
+    }
+
+    public void SaveProgress(SyncReport report)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+                File.WriteAllText(_filePath, JsonSerializer.Serialize(report));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "AniBridge: could not save sync progress snapshot.");
+            }
         }
     }
 

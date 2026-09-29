@@ -15,5 +15,12 @@ public sealed class SyncReport
     /// </summary>
     public string? Error { get; init; }
 
+    /// <summary>
+    /// True for interim snapshots written while the sync is still running.
+    /// The settings page keeps polling until a report with false arrives.
+    /// Defaults to false so reports written by older versions read as final.
+    /// </summary>
+    public bool InProgress { get; init; }
+
     public SyncResult Result { get; init; } = new();
 }

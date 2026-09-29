@@ -1,4 +1,8 @@
+using AniBridge.Arr.Radarr;
+using AniBridge.Arr.Sonarr;
 using AniBridge.Controllers;
+using AniBridge.Metadata;
+using AniBridge.Providers;
 using AniBridge.Providers.Models;
 using AniBridge.Sync;
 using Microsoft.AspNetCore.Mvc;
@@ -82,5 +86,100 @@ public class UxImprovementsTests
         var item = new SyncItem("X", AnimeStatus.Watching, SyncOutcome.Added, null);
         Assert.Null(item.SourceUrl);
         Assert.Null(item.Hint);
+    }
+
+    [Fact]
+    public void SaveProgress_UpdatesFileWithoutTouchingHistory()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var store = new FileSyncReportStore(dir, NullLogger<FileSyncReportStore>.Instance);
+
+        store.Save(new SyncReport { FinishedAt = DateTimeOffset.UtcNow });
+        Assert.Single(store.LoadHistory());
+
+        store.SaveProgress(new SyncReport
+        {
+            FinishedAt = DateTimeOffset.UtcNow,
+            InProgress = true,
+            Result = new SyncResult
+            {
+                Items = [new SyncItem("Live", AnimeStatus.Watching, SyncOutcome.WouldAdd, "Sonarr")],
+            },
+        });
+
+        // Last-sync file shows the interim snapshot, history still has just the final one.
+        Assert.True(store.Load()!.InProgress);
+        Assert.Equal("Live", store.Load()!.Result.Items[0].Title);
+        Assert.Single(store.LoadHistory());
+        Assert.False(store.LoadHistory()[0].InProgress);
+    }
+
+    [Fact]
+    public void OldReportJson_WithoutInProgress_ReadsAsFinal()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(
+            Path.Combine(dir, FileSyncReportStore.FileName),
+            """{"FinishedAt":"2026-09-28T20:00:00Z","DryRun":false,"Result":{"Items":[]}}""");
+        var store = new FileSyncReportStore(dir, NullLogger<FileSyncReportStore>.Instance);
+
+        Assert.False(store.Load()!.InProgress);
+    }
+
+    [Fact]
+    public async Task SyncService_WritesProgressSnapshotsDuringRun()
+    {
+        var progress = new List<SyncReport>();
+        var finals = new List<SyncReport>();
+        var service = new SyncService(
+            new ManyProvider(30),
+            new NullMetadata(),
+            new Lazy<SonarrClient>(() => throw new InvalidOperationException("must not be used")),
+            new Lazy<RadarrClient>(() => throw new InvalidOperationException("must not be used")),
+            NullLogger<SyncService>.Instance,
+            () => new Configuration.PluginConfiguration { DryRun = true },
+            TimeSpan.Zero,
+            new ProgressCapturingStore(progress, finals));
+
+        var result = await service.RunAsync();
+
+        Assert.Equal(30, result.Scanned);
+        // Progress at item 25 and at the final item 30; then one final Save.
+        Assert.Equal(2, progress.Count);
+        Assert.All(progress, p => Assert.True(p.InProgress));
+        Assert.Equal(25, progress[0].Result.Scanned);
+        var final = Assert.Single(finals);
+        Assert.False(final.InProgress);
+        Assert.Equal(30, final.Result.Scanned);
+    }
+
+    private sealed class ProgressCapturingStore(List<SyncReport> progress, List<SyncReport> finals)
+        : ISyncReportStore
+    {
+        public void Save(SyncReport report) => finals.Add(report);
+
+        public void SaveProgress(SyncReport report) => progress.Add(report);
+
+        public SyncReport? Load() => finals.LastOrDefault();
+    }
+
+    private sealed class ManyProvider(int count) : IAnimeProvider
+    {
+        public string Name => "Many";
+
+        public Task<IReadOnlyList<AnimeListItem>> GetListAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AnimeListItem>>(
+                Enumerable.Range(0, count)
+                    .Select(i => new AnimeListItem("Many", i.ToString(), "T" + i, "http://x/" + i, AnimeStatus.Watching, 0, null))
+                    .ToList());
+    }
+
+    private sealed class NullMetadata : IMetadataProvider
+    {
+        public string Name => "Null";
+
+        public Task<ResolvedMedia?> ResolveAsync(AnimeListItem item, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ResolvedMedia?>(null);
     }
 }

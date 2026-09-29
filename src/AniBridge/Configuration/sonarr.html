@@ -60,6 +60,31 @@
             }
         }
 
+        // Server serializes PascalCase (Jellyfin default); accept both casings.
+        function abPick(o, camel, pascal) {
+            if (!o) { return undefined; }
+            return o[camel] !== undefined ? o[camel] : o[pascal];
+        }
+
+        function abNormArr(data) {
+            data = data || {};
+            return {
+                qualityProfiles: abPick(data, 'qualityProfiles', 'QualityProfiles') || [],
+                rootFolders: abPick(data, 'rootFolders', 'RootFolders') || [],
+                error: abPick(data, 'error', 'Error')
+            };
+        }
+
+        function abNormStatus(s) {
+            s = s || {};
+            return {
+                shindenOk: !!abPick(s, 'shindenOk', 'ShindenOk'),
+                sonarrOk: !!abPick(s, 'sonarrOk', 'SonarrOk'),
+                radarrOk: !!abPick(s, 'radarrOk', 'RadarrOk'),
+                dryRun: !!abPick(s, 'dryRun', 'DryRun')
+            };
+        }
+
         function aniBridgeFillSelect(id, items, current) {
             var sel = document.querySelector('#' + id);
             sel.innerHTML = '';
@@ -92,8 +117,9 @@
                 contentType: 'application/json',
                 dataType: 'json'
             }).then(function (data) {
+                data = abNormArr(data);
                 aniBridgeFillSelect('SonarrQualityProfileId',
-                    (data.qualityProfiles || []).map(function (p) { return { value: String(p.id), text: p.name }; }),
+                    (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
                     savedProfile);
                 aniBridgeFillSelect('SonarrRootFolder',
                     (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
@@ -118,6 +144,7 @@
                 aniBridgeFillSelect('SonarrRootFolder', [], savedFolder);
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                     .then(function (s) {
+                        s = abNormStatus(s);
                         var el = document.querySelector('#AniBridgeSonarrChecklist');
                         el.textContent = 'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' +
                             (s.sonarrOk ? '✓' : '✗') + '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗') +
@@ -129,8 +156,9 @@
                     url: ApiClient.getUrl('AniBridge/sonarr/options'),
                     dataType: 'json'
                 }).then(function (data) {
+                    data = abNormArr(data);
                     aniBridgeFillSelect('SonarrQualityProfileId',
-                        (data.qualityProfiles || []).map(function (p) { return { value: String(p.id), text: p.name }; }),
+                        (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
                         savedProfile);
                     aniBridgeFillSelect('SonarrRootFolder',
                         (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),

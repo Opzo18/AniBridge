@@ -1,0 +1,8 @@
+<Project>
+  <!-- Single source of truth for the plugin version: repo-root VERSION file.
+       All .csproj files inherit <Version> from here; do not set <Version> in csproj. -->
+  <PropertyGroup>
+    <AniBridgeVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</AniBridgeVersion>
+    <Version>$(AniBridgeVersion)</Version>
+  </PropertyGroup>
+</Project>

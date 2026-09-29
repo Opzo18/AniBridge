@@ -8,7 +8,7 @@
     <!-- Jellyfin plugin: assembly name must match output dll placed in plugins/AniBridge/ -->
     <AssemblyName>AniBridge</AssemblyName>
     <RootNamespace>AniBridge</RootNamespace>
-    <Version>0.3.0</Version>
+    <!-- Version comes from repo-root VERSION via Directory.Build.props. -->
   </PropertyGroup>
 
   <ItemGroup>

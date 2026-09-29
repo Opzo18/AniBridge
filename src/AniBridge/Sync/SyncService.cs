@@ -17,6 +17,11 @@ public sealed class SyncService
 {
     private static readonly TimeSpan DefaultPacing = TimeSpan.FromMilliseconds(1000); // AniList limit 90/min
 
+    /// <summary>
+    /// Interim progress snapshot every N processed entries (also on the final entry).
+    /// </summary>
+    private const int ProgressEvery = 25;
+
     private readonly IAnimeProvider _provider;
     private readonly IMetadataProvider _metadata;
     private readonly Lazy<SonarrClient> _sonarr;
@@ -57,6 +62,11 @@ public sealed class SyncService
         {
             results.Add(await ProcessAsync(items[i], config, cancellationToken).ConfigureAwait(false));
             progress?.Report((double)(i + 1) / items.Count);
+            if ((i + 1) % ProgressEvery == 0 || i + 1 == items.Count)
+            {
+                SaveProgress(config, results);
+            }
+
             if (i + 1 < items.Count)
             {
                 await Task.Delay(_pacing, cancellationToken).ConfigureAwait(false);
@@ -88,6 +98,29 @@ public sealed class SyncService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "AniBridge: could not save last sync report.");
+        }
+    }
+
+    private void SaveProgress(PluginConfiguration? config, List<SyncItem> partial)
+    {
+        if (_reportStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _reportStore.SaveProgress(new SyncReport
+            {
+                FinishedAt = DateTimeOffset.UtcNow,
+                DryRun = config?.DryRun ?? false,
+                InProgress = true,
+                Result = new SyncResult { Items = partial.ToArray() },
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "AniBridge: could not save sync progress snapshot.");
         }
     }
 

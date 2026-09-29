@@ -34,6 +34,12 @@
 
             function tick(ok) { return ok ? '✓' : '✗'; }
 
+            // Server serializes PascalCase (Jellyfin default); accept both casings.
+            function abPick(o, camel, pascal) {
+                if (!o) { return undefined; }
+                return o[camel] !== undefined ? o[camel] : o[pascal];
+            }
+
             document.querySelector('#AniBridgeOverviewPage').addEventListener('pageshow', function () {
                 var list = document.querySelector('#AniBridgeOvChecklist');
                 var hint = document.querySelector('#AniBridgeOvHint');
@@ -42,10 +48,16 @@
                 list.textContent = 'Loading…';
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                     .then(function (s) {
-                        list.textContent = 'Shinden ' + tick(s.shindenOk) + '  ·  Sonarr ' + tick(s.sonarrOk) +
-                            '  ·  Radarr ' + tick(s.radarrOk);
-                        hint.textContent = s.hint || '';
-                        banner.textContent = s.dryRun
+                        s = s || {};
+                        var shindenOk = !!abPick(s, 'shindenOk', 'ShindenOk');
+                        var sonarrOk = !!abPick(s, 'sonarrOk', 'SonarrOk');
+                        var radarrOk = !!abPick(s, 'radarrOk', 'RadarrOk');
+                        var dryRun = !!abPick(s, 'dryRun', 'DryRun');
+                        var hint = abPick(s, 'hint', 'Hint');
+                        list.textContent = 'Shinden ' + tick(shindenOk) + '  ·  Sonarr ' + tick(sonarrOk) +
+                            '  ·  Radarr ' + tick(radarrOk);
+                        hint.textContent = hint || '';
+                        banner.textContent = dryRun
                             ? 'DRY RUN is ON — nothing is added to Sonarr/Radarr yet.'
                             : 'LIVE mode — sync adds to Sonarr/Radarr.';
                     }, function () {
@@ -54,12 +66,21 @@
                 last.textContent = 'Loading…';
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/last-sync'), dataType: 'json' })
                     .then(function (report) {
-                        var r = report.result || {};
-                        var when = report.finishedAt ? new Date(report.finishedAt).toLocaleString() : 'unknown time';
+                        report = report || {};
+                        var r = abPick(report, 'result', 'Result') || {};
+                        function c(camel, pascal) {
+                            var v = abPick(r, camel, pascal);
+                            return v === undefined || v === null ? 0 : v;
+                        }
+                        var when = abPick(report, 'finishedAt', 'FinishedAt');
+                        when = when ? new Date(when).toLocaleString() : 'no sync yet';
+                        var dryRun = !!abPick(report, 'dryRun', 'DryRun');
+                        var error = abPick(report, 'error', 'Error');
+                        var inProgress = !!abPick(report, 'inProgress', 'InProgress');
                         var parts = ['Scanned', 'Added', 'AlreadyExists', 'Skipped', 'Failed', 'WouldAdd']
-                            .map(function (k) { return k + ': ' + (r[k.charAt(0).toLowerCase() + k.slice(1)] || 0); });
-                        last.textContent = (report.dryRun ? '(dry run) ' : '') + 'Finished ' + when + ' — ' + parts.join(' · ') +
-                            (report.error ? ' — FAILED: ' + report.error : '');
+                            .map(function (k) { return k + ': ' + c(k.charAt(0).toLowerCase() + k.slice(1), k); });
+                        last.textContent = (dryRun ? '(dry run) ' : '') + (inProgress ? 'Running… ' : 'Finished ') + when + ' — ' + parts.join(' · ') +
+                            (error ? ' — FAILED: ' + error : '');
                     }, function () {
                         last.textContent = 'No sync has run yet.';
                     });

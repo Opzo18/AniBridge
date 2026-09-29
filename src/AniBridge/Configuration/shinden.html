@@ -140,6 +140,61 @@
             }
         }
 
+        // Server serializes PascalCase (Jellyfin default); accept both casings.
+        function abPick(o, camel, pascal) {
+            if (!o) { return undefined; }
+            return o[camel] !== undefined ? o[camel] : o[pascal];
+        }
+
+        function abNormItem(i) {
+            return {
+                title: abPick(i, 'title', 'Title') || '',
+                outcome: Number(abPick(i, 'outcome', 'Outcome')),
+                detail: abPick(i, 'detail', 'Detail'),
+                sourceUrl: abPick(i, 'sourceUrl', 'SourceUrl'),
+                aniListUrl: abPick(i, 'aniListUrl', 'AniListUrl'),
+                hint: abPick(i, 'hint', 'Hint')
+            };
+        }
+
+        function abNormReport(r) {
+            if (!r) { return null; }
+            var res = abPick(r, 'result', 'Result') || {};
+            var items = (abPick(res, 'items', 'Items') || []).map(abNormItem);
+            function n(o) { return items.filter(function (i) { return i.outcome === o; }).length; }
+            return {
+                finishedAt: abPick(r, 'finishedAt', 'FinishedAt'),
+                dryRun: !!abPick(r, 'dryRun', 'DryRun'),
+                error: abPick(r, 'error', 'Error'),
+                inProgress: !!abPick(r, 'inProgress', 'InProgress'),
+                result: {
+                    scanned: items.length,
+                    added: n(0), alreadyExists: n(1), skipped: n(2), failed: n(3), wouldAdd: n(4),
+                    items: items
+                }
+            };
+        }
+
+        function abNormStatus(s) {
+            s = s || {};
+            return {
+                shindenOk: !!abPick(s, 'shindenOk', 'ShindenOk'),
+                sonarrOk: !!abPick(s, 'sonarrOk', 'SonarrOk'),
+                radarrOk: !!abPick(s, 'radarrOk', 'RadarrOk'),
+                dryRun: !!abPick(s, 'dryRun', 'DryRun'),
+                hint: abPick(s, 'hint', 'Hint')
+            };
+        }
+
+        function abNormTest(t) {
+            t = t || {};
+            return {
+                ok: !!abPick(t, 'ok', 'Ok'),
+                message: abPick(t, 'message', 'Message') || 'No response from server.',
+                entries: abPick(t, 'entries', 'Entries')
+            };
+        }
+
         function aniBridgeTimeAgo(iso) {
             if (!iso) { return 'unknown time'; }
             var diff = Date.now() - new Date(iso).getTime();
@@ -152,6 +207,7 @@
         function aniBridgeLoadStatus() {
             ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                 .then(function (s) {
+                    s = abNormStatus(s);
                     document.querySelector('#AniBridgeChecklist').textContent =
                         'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' + (s.sonarrOk ? '✓' : '✗') +
                         '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗');
@@ -239,15 +295,17 @@
             var meta = document.querySelector('#AniBridgeLastSyncMeta');
             var badges = document.querySelector('#AniBridgeBadges');
             badges.innerHTML = '';
-            if (!report) {
+            if (!report || !report.finishedAt) {
                 meta.textContent = 'No sync has run yet.';
+                document.querySelector('#AniBridgeFatalHint').textContent = '';
                 aniBridgeFillList('AniBridgeAddedList', [], 300);
                 aniBridgeFillList('AniBridgeSkippedList', [], 300);
                 return;
             }
             var r = report.result || {};
             var items = r.items || [];
-            meta.textContent = 'Finished ' + aniBridgeTimeAgo(report.finishedAt) +
+            meta.textContent = (report.inProgress ? 'Running… updated ' : 'Finished ') +
+                aniBridgeTimeAgo(report.finishedAt) +
                 ' (' + new Date(report.finishedAt).toLocaleString() + ')' +
                 (report.dryRun ? ' (dry run)' : ' (live)');
             if (report.error) {
@@ -288,7 +346,9 @@
                 type: 'GET',
                 url: ApiClient.getUrl('AniBridge/last-sync'),
                 dataType: 'json'
-            }).then(aniBridgeRenderReport, function () {
+            }).then(function (report) {
+                aniBridgeRenderReport(abNormReport(report));
+            }, function () {
                 aniBridgeRenderReport(null);
             });
         }
@@ -298,20 +358,23 @@
             ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/history'), dataType: 'json' })
                 .then(function (history) {
                     sel.innerHTML = '';
-                    (history || []).forEach(function (h, idx) {
+                    history = (history || []).map(abNormReport).filter(function (h) { return h && h.finishedAt; });
+                    history.forEach(function (h, idx) {
                         var o = document.createElement('option');
                         o.value = String(idx);
-                        var when = h.finishedAt ? new Date(h.finishedAt).toLocaleString() : 'unknown';
+                        var when = new Date(h.finishedAt).toLocaleString();
                         o.textContent = (idx === 0 ? 'Latest — ' : '') + when + (h.dryRun ? ' (dry run)' : '') +
-                            (h.error ? ' FAILED' : '');
+                            (h.error ? ' FAILED' : '') + (h.inProgress ? ' (running…)' : '');
                         sel.appendChild(o);
                     });
-                    if (!history || history.length === 0) {
+                    if (history.length === 0) {
                         var o = document.createElement('option');
                         o.textContent = 'No history yet';
                         sel.appendChild(o);
+                        sel.disabled = true;
                         return;
                     }
+                    sel.disabled = false;
                     sel._history = history;
                     if (selected !== undefined) { sel.value = String(selected); }
                 }, function () { });
@@ -411,6 +474,7 @@
                 contentType: 'application/json',
                 dataType: 'json'
             }).then(function (r) {
+                r = abNormTest(r);
                 out.textContent = (r.ok ? '✓ ' : '✗ ') + r.message +
                     (r.entries !== null && r.entries !== undefined ? ' (' + r.entries + ' entries)' : '');
             }, function () {
@@ -437,20 +501,24 @@
                         tries++;
                         ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/last-sync'), dataType: 'json' })
                             .then(function (report) {
-                                if (report.finishedAt && report.finishedAt !== before) {
+                                report = abNormReport(report);
+                                if (report && report.inProgress) {
+                                    aniBridgeRenderReport(report);
+                                    status.textContent = 'Sync running… (' + report.result.scanned + ' scanned so far)';
+                                } else if (report && report.finishedAt && report.finishedAt !== before) {
                                     aniBridgeStopPoll();
                                     status.textContent = 'Sync finished — report updated.';
                                     aniBridgeRenderReport(report);
                                     aniBridgeLoadHistory(0);
                                     aniBridgeLoadStatus();
-                                } else if (tries > 120) {
+                                } else if (tries > 200) {
                                     aniBridgeStopPoll();
                                     status.textContent = 'Still running — check Dashboard → Scheduled Tasks.';
                                 } else {
                                     status.textContent = 'Sync running… (' + tries * 3 + 's)';
                                 }
                             }, function () {
-                                if (tries > 120) {
+                                if (tries > 200) {
                                     aniBridgeStopPoll();
                                     status.textContent = 'Still running — check Dashboard → Scheduled Tasks.';
                                 }

@@ -60,6 +60,21 @@
             }
         }
 
+        // Server serializes PascalCase (Jellyfin default); accept both casings.
+        function abPick(o, camel, pascal) {
+            if (!o) { return undefined; }
+            return o[camel] !== undefined ? o[camel] : o[pascal];
+        }
+
+        function abNormArrRadarr(data) {
+            data = data || {};
+            return {
+                qualityProfiles: abPick(data, 'qualityProfiles', 'QualityProfiles') || [],
+                rootFolders: abPick(data, 'rootFolders', 'RootFolders') || [],
+                error: abPick(data, 'error', 'Error')
+            };
+        }
+
         function aniBridgeFillSelectRadarr(id, items, current) {
             var sel = document.querySelector('#' + id);
             sel.innerHTML = '';
@@ -95,18 +110,20 @@
                 aniBridgeFillSelectRadarr('RadarrRootFolder', [], savedFolder);
                 ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('AniBridge/status'), dataType: 'json' })
                     .then(function (s) {
+                        s = s || {};
                         document.querySelector('#AniBridgeRadarrChecklist').textContent =
-                            'Shinden ' + (s.shindenOk ? '✓' : '✗') + '  ·  Sonarr ' +
-                            (s.sonarrOk ? '✓' : '✗') + '  ·  Radarr ' + (s.radarrOk ? '✓' : '✗') +
-                            (s.dryRun ? '  ·  DRY RUN' : '  ·  LIVE');
+                            'Shinden ' + (abPick(s, 'shindenOk', 'ShindenOk') ? '✓' : '✗') + '  ·  Sonarr ' +
+                            (abPick(s, 'sonarrOk', 'SonarrOk') ? '✓' : '✗') + '  ·  Radarr ' + (abPick(s, 'radarrOk', 'RadarrOk') ? '✓' : '✗') +
+                            (abPick(s, 'dryRun', 'DryRun') ? '  ·  DRY RUN' : '  ·  LIVE');
                     }, function () { });
                 ApiClient.ajax({
                     type: 'GET',
                     url: ApiClient.getUrl('AniBridge/radarr/options'),
                     dataType: 'json'
                 }).then(function (data) {
+                    data = abNormArrRadarr(data);
                     aniBridgeFillSelectRadarr('RadarrQualityProfileId',
-                        (data.qualityProfiles || []).map(function (p) { return { value: String(p.id), text: p.name }; }),
+                        (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
                         savedProfile);
                     aniBridgeFillSelectRadarr('RadarrRootFolder',
                         (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),
@@ -139,8 +156,9 @@
                 contentType: 'application/json',
                 dataType: 'json'
             }).then(function (data) {
+                data = abNormArrRadarr(data);
                 aniBridgeFillSelectRadarr('RadarrQualityProfileId',
-                    (data.qualityProfiles || []).map(function (p) { return { value: String(p.id), text: p.name }; }),
+                    (data.qualityProfiles || []).map(function (p) { return { value: String(abPick(p, 'id', 'Id')), text: abPick(p, 'name', 'Name') }; }),
                     document.querySelector('#RadarrQualityProfileId').value);
                 aniBridgeFillSelectRadarr('RadarrRootFolder',
                     (data.rootFolders || []).map(function (f) { return { value: f, text: f }; }),

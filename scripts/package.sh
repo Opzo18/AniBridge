@@ -6,16 +6,17 @@
 #
 # Steps: publish (Release) -> dist/anibridge_<version>.zip (AniBridge.dll + AngleSharp.dll)
 #        -> MD5 -> entry in manifest.json. Upload the ZIP manually to the GitHub Release tagged v<version>,
-#        commit manifest.json. The version comes from <Version> in the csproj.
+#        commit manifest.json. The version comes from the repo-root VERSION file
+#        (single source of truth, via Directory.Build.props).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export PATH="$HOME/.dotnet:$PATH"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 
-VERSION=$(sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' src/AniBridge/AniBridge.csproj | head -1)
+VERSION=$(tr -d ' \t\r\n' < VERSION)
 ABI3=$(sed -n 's/.*Jellyfin.Controller" Version="\([^"]*\)".*/\1/p' src/AniBridge/AniBridge.csproj | head -1)
-[ -n "$VERSION" ] && [ -n "$ABI3" ] || { echo "Could not read version from csproj."; exit 1; }
+[ -n "$VERSION" ] && [ -n "$ABI3" ] || { echo "Could not read VERSION file or ABI from csproj."; exit 1; }
 
 MANIFEST_VERSION="$VERSION.0"
 ABI="$ABI3.0"
