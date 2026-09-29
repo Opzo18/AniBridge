@@ -14,6 +14,17 @@ public class ShindenParserTests
         File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, AllFixture));
 
     [Fact]
+    public async Task ParseTitleAliases_RealTitlePage_ReturnsOtherTitles()
+    {
+        var html = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "Providers/Shinden/Fixtures/shinden_series_dogulwang.html"));
+
+        var aliases = await ShindenParser.ParseTitleAliasesAsync(html);
+
+        Assert.Equal(["도굴왕", "盗掘王", "Tomb Raider King", "Dogul Wang", "Toukutsu Ou"], aliases);
+    }
+
+    [Fact]
     public async Task ParseTitleAliases_JsonLdAlternateName_ReturnsAliases()
     {
         const string Html = """

@@ -81,7 +81,8 @@ public static class ShindenParser
     /// AniList queries when the list title does not match (e.g. "Dogulwang" →
     /// "도굴왕, 盗掘王, Tomb Raider King").
     /// Best-effort: unknown markup yields an empty list, never an exception.
-    /// Strategies: JSON-LD alternateName, og:title, labeled "…tytuły" rows.
+    /// Strategies: div.title-other, JSON-LD alternateName, og:title,
+    /// labeled "…tytuły" rows.
     /// </summary>
     public static async Task<IReadOnlyList<string>> ParseTitleAliasesAsync(
         string html, CancellationToken cancellationToken = default)
@@ -91,6 +92,17 @@ public static class ShindenParser
         {
             var parser = new HtmlParser();
             var doc = await parser.ParseDocumentAsync(html, cancellationToken).ConfigureAwait(false);
+
+            var other = doc.QuerySelector("div.title-other");
+            if (other is not null)
+            {
+                foreach (var link in other.QuerySelectorAll("a"))
+                {
+                    link.Remove();
+                }
+
+                AddAliases(other.TextContent, found);
+            }
 
             foreach (var block in doc.QuerySelectorAll("script[type=\"application/ld+json\"]"))
             {
